@@ -104,9 +104,10 @@ const formatters = {
     }
   },
 
-  formatDate: (date: string | null | undefined): string => {
+  formatDate: (date: string | Date | null | undefined): string => {
     if (!date) return '';
-    return new Date(date).toLocaleDateString('en-US', {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
@@ -334,7 +335,7 @@ const linearService = {
       span?.event({
         name: 'linear_update_issue_success',
         input: { issueId },
-        output: { issue: result.issue.id }
+        output: { issue: (await result.issue).id }
       });
 
       return result.issue;
@@ -565,7 +566,7 @@ const linearService = {
 
   execute: async (
     action: string,
-    payload: Record<string, any>,
+    payload: unknown,
     span?: LangfuseSpanClient
   ): Promise<DocumentType> => {
     const state = stateManager.getState();

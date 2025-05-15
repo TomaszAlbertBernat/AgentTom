@@ -1,61 +1,134 @@
-import {Hono} from 'hono';
-import {AppEnv} from '../types/hono';
-import {completion} from '../services/common/llm.service';
-import {streamResponse} from '../utils/response';
-import {isChatCompletion, isStreamResponse} from '../types/guards';
-import {setAssistantResponse, setInteractionState} from '../services/agent/agi.service';
-import {observer} from '../services/agent/observer.service';
-import {prompt as answerPrompt} from '../prompts/agent/answer';
+import { Hono } from 'hono';
+import { z } from 'zod';
+import { zValidator } from '@hono/zod-validator';
+import { OpenAI } from 'openai';
+import { v4 as uuidv4 } from 'uuid';
+import { db } from '../database';
+import { conversations } from '../schema/conversations';
+import { messages } from '../schema/messages';
 
-import {CoreMessage} from 'ai';
-import {stateManager} from '../services/agent/state.service';
-import {aiService} from '../services/agent/ai.service';
-import {taskService} from '../services/agent/task.service';
-import {actionService} from '../services/agent/action.service';
+const agi = new Hono();
 
-export default new Hono<AppEnv>().post('/chat', async c => {
-  const request = c.get('request');
-  const conversation_id = await setInteractionState(request);
-  const trace = observer.initializeTrace(request.conversation_id || 'general');
+// Initialize OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-  await aiService.fastTrack(trace);
-  let state = stateManager.getState();
+// Validation schemas
+const messageSchema = z.object({
+  content: z.string().min(1),
+  conversation_id: z.string().optional(),
+});
 
-  if (!state.config.fast_track) {
-    await aiService.think();
+// Create new conversation
+agi.post('/conversations', async (c) => {
+  const conversation_id = uuidv4();
+  const user_id = c.get('jwtPayload').user_id;
+
+  await db.insert(conversations).values({
+    id: conversation_id,
+    user_id,
+    created_at: new Date(),
+    updated_at: new Date(),
+  });
+
+  return c.json({ conversation_id });
+});
+
+// Send message
+agi.post('/messages', zValidator('json', messageSchema), async (c) => {
+  const { content, conversation_id } = c.req.valid('json');
+  const user_id = c.get('jwtPayload').user_id;
+
+  // Get or create conversation
+  let current_conversation_id = conversation_id;
+  if (!current_conversation_id) {
+    current_conversation_id = uuidv4();
+    await db.insert(conversations).values({
+      id: current_conversation_id,
+      user_id,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
   }
 
-  state = stateManager.getState();
+  // Store user message
+  const user_message_id = uuidv4();
+  await db.insert(messages).values({
+    id: user_message_id,
+    conversation_id: current_conversation_id,
+    role: 'user',
+    content,
+    created_at: new Date(),
+  });
 
-  const messages: CoreMessage[] = [{role: 'system', content: answerPrompt(state)}, ...request.messages];
-  const final_generation = observer.startGeneration({name: 'final_answer', input: messages});
-  const result = request.stream
-    ? await completion.stream({...request, messages})
-    : await completion.text({...request, messages}, true);
+  // Get conversation history
+  const history = await db.query.messages.findMany({
+    where: (messages, { eq }) => eq(messages.conversation_id, current_conversation_id),
+    orderBy: (messages, { asc }) => [asc(messages.created_at)],
+  });
 
-  if (!request.stream && isChatCompletion(result)) {
-    observer.endGeneration(final_generation.id, result);
+  // Prepare messages for OpenAI
+  const openai_messages = history.map(msg => ({
+    role: msg.role,
+    content: msg.content,
+  }));
 
-    const final_task = state.interaction.tasks.find(task => task.type === 'final');
-    const response_content = result.choices[0]?.message?.content || '';
+  // Get AI response
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: openai_messages,
+    temperature: 0.7,
+    max_tokens: 2000,
+  });
 
-    if (final_task) {
-      await Promise.all([
-        taskService.updateTaskStatus(final_task.uuid, 'completed'),
-        taskService.updateTaskResult(final_task.uuid, response_content),
-        state.config.current_action?.uuid && actionService.updateActionWithResult(state.config.current_action.uuid, 'This turn was completed. ')
-      ]);
-    }
+  const ai_response = completion.choices[0].message.content;
 
-    await setAssistantResponse({conversation_id, response: result});
+  // Store AI response
+  const ai_message_id = uuidv4();
+  await db.insert(messages).values({
+    id: ai_message_id,
+    conversation_id: current_conversation_id,
+    role: 'assistant',
+    content: ai_response,
+    created_at: new Date(),
+  });
+
+  // Update conversation timestamp
+  await db.update(conversations)
+    .set({ updated_at: new Date() })
+    .where(eq(conversations.id, current_conversation_id));
+
+  return c.json({
+    conversation_id: current_conversation_id,
+    response: ai_response,
+  });
+});
+
+// Get conversation history
+agi.get('/conversations/:id/messages', async (c) => {
+  const conversation_id = c.req.param('id');
+  const user_id = c.get('jwtPayload').user_id;
+
+  // Verify conversation belongs to user
+  const conversation = await db.query.conversations.findFirst({
+    where: (conversations, { eq, and }) => and(
+      eq(conversations.id, conversation_id),
+      eq(conversations.user_id, user_id)
+    ),
+  });
+
+  if (!conversation) {
+    return c.json({ error: 'Conversation not found' }, 404);
   }
 
-  return request.stream && isStreamResponse(result)
-    ? streamResponse(c, result, {
-        traceId: trace.id,
-        generationId: final_generation.id,
-        messages: request.messages,
-        conversation_id
-      })
-    : c.json(result);
-})
+  // Get messages
+  const history = await db.query.messages.findMany({
+    where: (messages, { eq }) => eq(messages.conversation_id, conversation_id),
+    orderBy: (messages, { asc }) => [asc(messages.created_at)],
+  });
+
+  return c.json({ messages: history });
+});
+
+export { agi as agiRoutes };

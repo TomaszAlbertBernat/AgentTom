@@ -11,10 +11,29 @@ import {prompt as askSearchPrompt} from '../../prompts/tools/search.ask';
 import {prompt as pickResourcesPrompt} from '../../prompts/tools/search.pick';
 import {completion} from '../common/llm.service';
 import {stateManager} from '../agent/state.service';
+import {createTextService} from '../common/text.service';
 
 const envSchema = z.object({
   FIRECRAWL_API_KEY: z.string()
 });
+
+const searchPayloadSchema = z.object({
+  query: z.string()
+});
+
+const getContentsPayloadSchema = z.object({
+  url: z.string()
+});
+
+interface ScrapeResponse {
+  markdown: string;
+}
+
+interface ErrorResponse {
+  error: string;
+}
+
+type ScrapeResult = ScrapeResponse | ErrorResponse;
 
 const webService = {
   createClient: () => {
@@ -32,9 +51,13 @@ const webService = {
         input: {url}
       });
 
-      const scrape_result = await firecrawl.scrapeUrl(url, {formats: ['markdown']});
+      const scrape_result = await firecrawl.scrapeUrl(url, {formats: ['markdown']}) as ScrapeResult;
 
-      const content = scrape_result?.markdown?.trim() || '';
+      if ('error' in scrape_result) {
+        throw new Error(scrape_result.error);
+      }
+
+      const content = scrape_result.markdown?.trim() || '';
       
       if (!content) {
         return documentService.createDocument({
@@ -117,23 +140,21 @@ const webService = {
     }
   },
 
-  async execute(action: string, payload: {url?: string, query?: string}, span?: LangfuseSpanClient) {
+  async execute(action: string, payload: unknown, span?: LangfuseSpanClient): Promise<DocumentType> {
     if (action === 'search') {
-      if (!payload.query) {
-        throw new Error('Query is required for search action');
-      }
-
+      const { query } = searchPayloadSchema.parse(payload);
       const state = stateManager.getState();
       const conversation_uuid = state.config.conversation_uuid ?? 'unknown';
+      const text_service = await createTextService({model_name: 'gpt-4o'});
 
       span?.event({
         name: 'web_search_start',
-        input: {query: payload.query}
+        input: {query}
       });
 
       // 1. Check if search is needed
       const searchNecessity = await completion.object<{shouldSearch: boolean, _thoughts: string}>({
-        messages: [{role: 'system', content: useSearchPrompt()}, {role: 'user', content: payload.query}],
+        messages: [{role: 'system', content: useSearchPrompt()}, {role: 'user', content: query}],
         model: state.config.model ?? 'gpt-4o',
         temperature: 0,
         user: {
@@ -145,15 +166,26 @@ const webService = {
       if (!searchNecessity.shouldSearch) {
         span?.event({
           name: 'web_search_skipped',
-          input: {query: payload.query},
+          input: {query},
           output: {reason: searchNecessity._thoughts}
         });
-        return [];
+        return documentService.createDocument({
+          conversation_uuid,
+          source_uuid: conversation_uuid,
+          text: searchNecessity._thoughts,
+          metadata_override: {
+            type: 'document',
+            content_type: 'full',
+            name: 'SearchSkipped',
+            source: 'web',
+            description: 'Search was not necessary based on the query'
+          }
+        });
       }
 
       // 2. Generate queries
       const queryGeneration = await completion.object<{queries: Array<{q: string, url: string}>, _thoughts: string}>({
-        messages: [{role: 'system', content: askSearchPrompt(whitelistedDomains)}, {role: 'user', content: payload.query}],
+        messages: [{role: 'system', content: askSearchPrompt(whitelistedDomains)}, {role: 'user', content: query}],
         model: state.config.model ?? 'gpt-4o',
         temperature: 0,
         user: {
@@ -165,159 +197,113 @@ const webService = {
       if (!queryGeneration.queries.length) {
         span?.event({
           name: 'web_search_no_queries',
-          input: {query: payload.query}
+          input: {query}
         });
-        return [];
+        return documentService.createDocument({
+          conversation_uuid,
+          source_uuid: conversation_uuid,
+          text: 'No valid search queries could be generated.',
+          metadata_override: {
+            type: 'document',
+            content_type: 'full',
+            name: 'NoQueriesGenerated',
+            source: 'web',
+            description: 'Failed to generate valid search queries'
+          }
+        });
       }
 
-      // 3. Execute searches with direct API calls
+      // 3. Execute searches
       const searchResults = await Promise.all(
         queryGeneration.queries.map(async ({q, url}) => {
           try {
-            const domain = new URL(url.startsWith('http') ? url : `https://${url}`);
-            const siteQuery = `site:${domain.hostname} ${q}`;
-            
-            const response = await fetch('https://api.firecrawl.dev/v0/search', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.FIRECRAWL_API_KEY}`
-              },
-              body: JSON.stringify({
-                query: siteQuery,
-                searchOptions: {
-                  limit: 6
-                },
-                pageOptions: {
-                  fetchPageContent: false
-                }
-              })
-            });
-
-            const result = await response.json();
-
-            if (!result.success) {
-              throw new Error(result.error || 'Search failed');
+            const response = await webService.createClient().scrapeUrl(url, {formats: ['markdown']}) as ScrapeResult;
+            if ('error' in response) {
+              throw new Error(response.error);
             }
-
+            if (!response.markdown) {
+              throw new Error('No markdown content found');
+            }
             return {
-              query: q,
-              domain: domain.href,
-              results: result.data?.map(item => ({
-                url: item.url,
-                title: item.title,
-                description: item.description
-              })) || []
+              url,
+              content: response.markdown,
+              query: q
             };
           } catch (error) {
-            span?.event({
-              name: 'web_search_error',
-              input: {query: q, url},
-              output: {error: error instanceof Error ? error.message : 'Unknown error'}
-            });
-            return {query: q, domain: url, results: []};
+            console.error(`Failed to scrape ${url}:`, error);
+            return null;
           }
         })
       );
 
-      // 4. Select resources to load
-      const resourceSelection = await completion.object<{urls: string[]}>({
-        messages: [{
-          role: 'system',
-          content: pickResourcesPrompt({resources: searchResults})
-        }, {
-          role: 'user',
-          content: payload.query
-        }],
-        model: state.config.model ?? 'gpt-4o',
-        temperature: 0,
-        user: {
-          uuid: state.config.user_uuid ?? '',
-          name: state.profile.user_name
-        }
-      });
+      const validResults = searchResults.filter((result): result is NonNullable<typeof result> => result !== null);
 
-      // 5. Scrape and create documents
-      const documents = await Promise.all(
-        resourceSelection.urls.map(async (url) => {
-          try {
-            const firecrawl = webService.createClient();
-            const scrapeResult = await firecrawl.scrapeUrl(url, {formats: ['markdown']});
-
-            if (!scrapeResult?.markdown) {
-              throw new Error('No content found');
-            }
-
-            const content = scrapeResult.markdown.trim();
-            const tokenizer = await createTokenizer();
-            const tokens = tokenizer.countTokens(content);
-
-            return documentService.createDocument({
-              conversation_uuid,
-              source_uuid: uuidv4(),
-              text: content || 'No content could be loaded from this URL',
-              content_type: 'full',
-              name: `Web content from ${url}`,
-              description: `Loaded content from ${url}`,
-              metadata_override: {
-                type: 'text',
-                content_type: 'full',
-                source: url,
-                urls: [url],
-                tokens,
-                conversation_uuid,
-                source_uuid: uuidv4()
-              }
-            });
-          } catch (error) {
-            const error_text = `Failed to fetch content from ${url}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-            const tokenizer = await createTokenizer();
-            const tokens = tokenizer.countTokens(error_text);
-
-            return documentService.createDocument({
-              conversation_uuid,
-              source_uuid: uuidv4(),
-              text: error_text,
-              content_type: 'full',
-              name: 'Web Scraping Error',
-              description: `Failed to scrape content from ${url}`,
-              metadata_override: {
-                type: 'text',
-                content_type: 'full',
-                source: url,
-                urls: [url],
-                tokens,
-                conversation_uuid,
-                source_uuid: uuidv4()
-              }
-            });
+      if (validResults.length === 0) {
+        return documentService.createDocument({
+          conversation_uuid,
+          source_uuid: conversation_uuid,
+          text: 'No valid search results found.',
+          metadata_override: {
+            type: 'document',
+            content_type: 'full',
+            name: 'NoResultsFound',
+            source: 'web',
+            description: 'Failed to find any valid search results'
           }
+        });
+      }
+
+      // 4. Create documents from results
+      const documents = await Promise.all(
+        validResults.map(async (result) => {
+          const [tokenized_content] = await text_service.split(result.content, Infinity);
+          return documentService.createDocument({
+            conversation_uuid,
+            source_uuid: conversation_uuid,
+            text: result.content,
+            metadata_override: {
+              type: 'document',
+              content_type: 'full',
+              name: `SearchResult-${result.url}`,
+              source: 'web',
+              description: `Search result for query: ${result.query}`,
+              urls: [result.url]
+            }
+          });
         })
       );
 
       span?.event({
         name: 'web_search_complete',
-        input: {query: payload.query},
+        input: {query},
         output: {documents_count: documents.length}
       });
 
-      return documents[0];
-    }
-
-    if (!payload.url) {
-      throw new Error('URL is required');
+      return documentService.createDocument({
+        conversation_uuid,
+        source_uuid: conversation_uuid,
+        text: `Found ${documents.length} relevant documents.`,
+        metadata_override: {
+          type: 'document',
+          content_type: 'full',
+          name: 'SearchSummary',
+          source: 'web',
+          description: `Search completed with ${documents.length} results`
+        }
+      });
     }
 
     if (action === 'get_contents') {
+      const { url } = getContentsPayloadSchema.parse(payload);
       span?.event({
-      name: 'web_tool',
-      input: {
-        action,
-        url: payload.url
+        name: 'web_tool',
+        input: {
+          action,
+          url
         }
       });
 
-      return webService.getContents(payload.url, 'unknown', span);
+      return webService.getContents(url, 'unknown', span);
     }
 
     throw new Error(`Unknown action: ${action}`);

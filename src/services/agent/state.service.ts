@@ -24,23 +24,35 @@ const StateSchema = z.object({
   thoughts: z.object({
     environment: z.string(),
     context: z.string(),
-    memory: z.array(z.any()),
-    tools: z.array(z.any())
+    memory: z.array(z.object({
+      query: z.string(),
+      category: z.string(),
+      subcategory: z.string()
+    })),
+    tools: z.array(z.object({
+      query: z.string(),
+      tool: z.string()
+    }))
   }),
   profile: z.object({
-    environment: z.record(z.any()),
+    environment: z.record(z.unknown()),
     context: z.string(),
     ai_name: z.string(),
     user_name: z.string()
   }),
   interaction: z.object({
     tasks: z.array(z.any()),
-    messages: z.array(z.any())
+    messages: z.array(z.any()),
+    tool_context: z.array(z.any())
   }),
   session: z.object({
     memories: z.array(z.any()),
     tools: z.array(z.any()),
-    categories: z.array(z.any()),
+    categories: z.array(z.object({
+      category: z.string(),
+      subcategory: z.string(),
+      description: z.string()
+    })),
     documents: z.array(z.any())
   })
 });

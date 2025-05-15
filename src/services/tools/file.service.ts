@@ -30,12 +30,16 @@ const filePayloadSchema = z.discriminatedUnion('action', [
   }),
   z.object({
     action: z.literal('load'),
-    path: z.string(),
+    payload: z.object({
+      path: z.string()
+    })
   }),
   z.object({
     action: z.literal('upload'),
-    path: z.string(),
-    content: z.string(),
+    payload: z.object({
+      path: z.string(),
+      content: z.string()
+    })
   })
 ]);
 
@@ -454,21 +458,17 @@ const fileService = {
         input: { action, payload }
       });
 
-      switch (action) {
+      const validatedPayload = filePayloadSchema.parse({ action, payload });
+
+      switch (validatedPayload.action) {
         case 'write': {
-          const parsed = WritePayloadSchema.parse(payload);
-          return fileService.write(parsed.query, parsed.context, conversation_uuid, span);
+          return fileService.write(validatedPayload.payload.query, validatedPayload.payload.context, conversation_uuid, span);
         }
         case 'load': {
-          const {path} = z.object({ path: z.string() }).parse(payload);
-          return fileService.load(path, conversation_uuid, span);
+          return fileService.load(validatedPayload.payload.path, conversation_uuid, span);
         }
         case 'upload': {
-          const {path, content} = z.object({ 
-            path: z.string(),
-            content: z.string()
-          }).parse(payload);
-          return fileService.uploadFile(path, content, conversation_uuid, span);
+          return fileService.uploadFile(validatedPayload.payload.path, validatedPayload.payload.content, conversation_uuid, span);
         }
         default:
           return documentService.createErrorDocument({

@@ -74,7 +74,7 @@ ${
 
 <memories name="already recalled memories">
 ${state.thoughts.memory
-  ?.map(memory => `<memory name="${memory.category}">${memory.document?.text}</memory>`)
+  ?.map(memory => `<memory category="${memory.category}" subcategory="${memory.subcategory}">${memory.query}</memory>`)
   .join('\n')}
 </memories>
 

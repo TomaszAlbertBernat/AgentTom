@@ -1,7 +1,7 @@
-import {migrate} from 'drizzle-orm/bun-sqlite/migrator';
-import db from './db';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { sqlite } from './index';
 
-// This will automatically run needed migrations on the database
-migrate(db, {migrationsFolder: './src/database/migrations'});
+// Run migrations
+migrate(sqlite, { migrationsFolder: './src/database/migrations' });
 
-console.log('Migrations complete');
+console.log('Migrations completed successfully');
