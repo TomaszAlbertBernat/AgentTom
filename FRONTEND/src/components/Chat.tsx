@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, ChangeEvent, KeyboardEvent } from 'react';
 import {
   Box,
   VStack,
@@ -37,7 +37,7 @@ export const Chat = () => {
       created_at: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev: Message[]) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
@@ -52,7 +52,7 @@ export const Chat = () => {
         created_at: new Date().toISOString(),
       };
 
-      setMessages((prev) => [...prev, aiMessage]);
+      setMessages((prev: Message[]) => [...prev, aiMessage]);
     } catch (error) {
       toast({
         title: 'Error',
@@ -62,6 +62,17 @@ export const Chat = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+  };
+
+  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
   };
 
@@ -76,7 +87,7 @@ export const Chat = () => {
           borderRadius="lg"
           bg="gray.50"
         >
-          {messages.map((message) => (
+          {messages.map((message: Message) => (
             <Flex
               key={message.id}
               justify={message.role === 'user' ? 'flex-end' : 'flex-start'}
@@ -88,8 +99,9 @@ export const Chat = () => {
                 borderRadius="lg"
                 bg={message.role === 'user' ? 'blue.500' : 'white'}
                 color={message.role === 'user' ? 'white' : 'black'}
+                boxShadow="sm"
               >
-                <Text>{message.content}</Text>
+                <Text whiteSpace="pre-wrap">{message.content}</Text>
               </Box>
             </Flex>
           ))}
@@ -98,15 +110,17 @@ export const Chat = () => {
         <Flex>
           <Input
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
+            onKeyPress={handleKeyPress}
             placeholder="Type your message..."
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            disabled={isLoading}
           />
           <Button
             ml={2}
             colorScheme="blue"
             onClick={handleSend}
             isLoading={isLoading}
+            disabled={!input.trim()}
           >
             Send
           </Button>

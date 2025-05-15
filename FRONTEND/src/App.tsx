@@ -2,10 +2,15 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './components/Login';
 import { Chat } from './components/Chat';
+import { Loading } from './components/Loading';
 import { useAuthStore } from './store/authStore';
 import { useEffect } from 'react';
 
-const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
+interface PrivateRouteProps {
+  children: React.ReactNode;
+}
+
+const PrivateRoute = ({ children }: PrivateRouteProps) => {
   const { isAuthenticated, checkAuth, isLoading } = useAuthStore();
 
   useEffect(() => {
@@ -13,7 +18,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   }, [checkAuth]);
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <Loading message="Checking authentication..." />;
   }
 
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
@@ -33,6 +38,7 @@ function App() {
               </PrivateRoute>
             }
           />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </ChakraProvider>
