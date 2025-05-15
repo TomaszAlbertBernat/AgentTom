@@ -3,6 +3,7 @@ import {Database} from 'bun:sqlite';
 import * as schema from '../schema';
 import {v4 as uuidv4} from 'uuid';
 import { memory_categories } from '../config/memory.config';
+import {type NewMessage} from '../schema/message';
 
 const sqlite = new Database('./agi.db');
 const db = drizzle(sqlite, {schema});
@@ -214,7 +215,7 @@ Notes:
 - When writing, mimic Paul Graham and Shane Parrish style of writing
 - If you have some content available and the user asks for some specific information, you must rewrite only the requested information, not to reference document/actions UUIDs
 - You can reference document/action UUIDs within email body using their IDs but only if you need the entire content, otherwise it's better to simply rewrite parts of the content in the email body
-- Don't refer the UUID when the content is not redable for human unless you're doing it in attachment field
+- Don't refer the UUID when the content is not readable for human unless you're doing it in attachment field
 - Attachments array can include UUIDs of previously created documents or action results
 - Always provide a plain text version, HTML is optional
 - Keep subjects clear and descriptive
@@ -441,24 +442,22 @@ const conversations = [
   }
 ];
 
-const messages = [
+const messages: NewMessage[] = [
   {
     uuid: uuidv4(),
     conversation_uuid: conversations[0].uuid,
-    role: 'user',
-    content_type: 'text',
+    role: 'user' as const,
+    content_type: 'text' as const,
     content: 'Hi, can you help me with the project setup?',
-    source: 'chat',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },
   {
     uuid: uuidv4(),
     conversation_uuid: conversations[0].uuid,
-    role: 'assistant',
-    content_type: 'text',
+    role: 'assistant' as const,
+    content_type: 'text' as const,
     content: "Sure! Let's get started. What framework are you using?",
-    source: 'chat',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }
