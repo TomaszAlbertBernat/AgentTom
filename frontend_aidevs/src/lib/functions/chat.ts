@@ -7,12 +7,12 @@ export const generateAnswer = async (currentState: IState) => {
         apikey: currentState.apikey,
         stream: currentState.stream,
         messages: currentState.messages,
+        conversation_uuid: currentState.conversation_uuid
     });
     if (typeof response === 'string') {
         await displayAnswer({ stream: currentState.stream }, response);
     } else if (response ) {
-        console.log(response);
-        console.error('An error occurred during OpenAI request', response.statusText ?? '');
+        console.error('An error occurred during API request', response.statusText ?? '');
     }
 }
 

@@ -1,6 +1,6 @@
 export interface IState {
     apikey: string,
-    model: 'gpt-4' | 'gpt-3.5-turbo',
+    model: 'gpt-4' | 'gpt-3.5-turbo' | 'gpt-4o',
     max_tokens: number,
     temperature: number,
     stream: boolean,
@@ -8,6 +8,7 @@ export interface IState {
     shortcuts: IShortcut[],
     query: string,
     answer: string,
+    conversation_uuid?: string,
 }
 
 export interface IShortcut {
