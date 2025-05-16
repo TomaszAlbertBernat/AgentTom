@@ -5,6 +5,8 @@ import * as conversationsSchema from '../schema/conversations';
 import * as messagesSchema from '../schema/messages';
 import * as toolsSchema from '../schema/tools';
 import * as toolExecutionsSchema from '../schema/tool_executions';
+import { drizzle as drizzleSqlite } from 'drizzle-orm/bun-sqlite';
+import { Database } from 'bun:sqlite';
 
 // Initialize libSQL client
 const client = createClient({
@@ -13,6 +15,18 @@ const client = createClient({
 
 // Create Drizzle instance with all schemas
 export const db = drizzle(client, {
+  schema: {
+    ...schema,
+    ...conversationsSchema,
+    ...messagesSchema,
+    ...toolsSchema,
+    ...toolExecutionsSchema,
+  },
+});
+
+// SQLite setup for migrations
+const sqliteDb = new Database('./agi.db');
+export const sqlite = drizzleSqlite(sqliteDb, {
   schema: {
     ...schema,
     ...conversationsSchema,

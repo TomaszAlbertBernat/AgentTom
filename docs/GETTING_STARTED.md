@@ -1,4 +1,4 @@
-# Getting Started with AliceAGI
+# Getting Started with AgentTom
 
 This guide will help you set up and run AliceAGI on your local machine.
 
@@ -14,7 +14,7 @@ This guide will help you set up and run AliceAGI on your local machine.
 1. Clone the repository:
 ```bash
 git clone [repository-url]
-cd alice-agi
+cd AgentTom
 ```
 
 2. Install dependencies:
