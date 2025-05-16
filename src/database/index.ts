@@ -1,16 +1,18 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/libsql';
+import { createClient } from '@libsql/client';
 import * as schema from '../schema/users';
 import * as conversationsSchema from '../schema/conversations';
 import * as messagesSchema from '../schema/messages';
 import * as toolsSchema from '../schema/tools';
 import * as toolExecutionsSchema from '../schema/tool_executions';
 
-// Initialize SQLite database
-const sqlite = new Database('agi.db');
+// Initialize libSQL client
+const client = createClient({
+  url: 'file:agi.db',
+});
 
 // Create Drizzle instance with all schemas
-export const db = drizzle(sqlite, {
+export const db = drizzle(client, {
   schema: {
     ...schema,
     ...conversationsSchema,
@@ -21,4 +23,4 @@ export const db = drizzle(sqlite, {
 });
 
 // Export for use in migrations
-export { sqlite }; 
+export { client }; 

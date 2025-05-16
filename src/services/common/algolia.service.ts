@@ -1,5 +1,5 @@
-import { searchClient, type SearchClient } from '@algolia/client-search';
-import type { SearchResponse, QueryType, RemoveWordsIfNoResults } from '@algolia/client-search';
+import algoliasearch from 'algoliasearch';
+import type { SearchResponse, SearchOptions } from 'algoliasearch';
 import type { DocumentType } from '../agent/document.service';
 
 interface AlgoliaDocument {
@@ -19,23 +19,26 @@ interface AlgoliaDocument {
   metadata: Record<string, unknown>;
 }
 
-let client: SearchClient;
+let client: ReturnType<typeof algoliasearch>;
 try {
-  client = searchClient(process.env.ALGOLIA_APP_ID!, process.env.ALGOLIA_API_KEY!);
+  client = algoliasearch(
+    process.env.ALGOLIA_APP_ID!,
+    process.env.ALGOLIA_API_KEY!
+  );
 } catch (error) {
   console.error('Failed to initialize Algolia client. Check ALGOLIA_APP_ID and ALGOLIA_API_KEY in .env. Algolia is required for indexing.');
 }
 
 const DOCUMENTS_INDEX = process.env.ALGOLIA_INDEX!;
+const index = client.initIndex(DOCUMENTS_INDEX);
 
-const DEFAULT_SEARCH_PARAMS = {
+const DEFAULT_SEARCH_PARAMS: SearchOptions = {
   hitsPerPage: 15,
   page: 0,
   attributesToRetrieve: ['*'],
   typoTolerance: true,
   ignorePlurals: true,
   removeStopWords: true,
-  queryType: 'prefixNone' as QueryType,
   attributesToHighlight: ['*'],
   highlightPreTag: '<em>',
   highlightPostTag: '</em>',
@@ -47,7 +50,6 @@ const DEFAULT_SEARCH_PARAMS = {
   minWordSizefor1Typo: 3,
   minWordSizefor2Typos: 7,
   advancedSyntax: true,
-  removeWordsIfNoResults: 'none' as RemoveWordsIfNoResults,
 };
 
 export const algoliaService = {
@@ -74,10 +76,7 @@ export const algoliaService = {
 
       console.log('Indexing document to Algolia:', algolia_document);
 
-      await client.saveObject({ 
-        indexName: DOCUMENTS_INDEX, 
-        body: algolia_document 
-      });
+      await index.saveObject(algolia_document);
     } catch (error) {
       console.error('Failed to index document in Algolia:', error);
       throw error;
@@ -93,17 +92,14 @@ export const algoliaService = {
         return;
       }
 
-      await client.partialUpdateObject({ 
-        indexName: DOCUMENTS_INDEX, 
-        objectID: document.uuid, 
-        attributesToUpdate: {
-          text: document.text,
-          source: metadata.source,
-          name: metadata.name,
-          description: metadata.description,
-          updated_at: document.updated_at,
-          ...metadata
-        }
+      await index.partialUpdateObject({
+        objectID: document.uuid,
+        text: document.text,
+        source: metadata.source,
+        name: metadata.name,
+        description: metadata.description,
+        updated_at: document.updated_at,
+        ...metadata
       });
     } catch (error) {
       console.error('Failed to update document in Algolia:', error);
@@ -113,10 +109,7 @@ export const algoliaService = {
 
   async deleteDocument(uuid: string): Promise<void> {
     try {
-      await client.deleteObject({ 
-        indexName: DOCUMENTS_INDEX, 
-        objectID: uuid 
-      });
+      await index.deleteObject(uuid);
     } catch (error) {
       console.error('Failed to delete document from Algolia:', error);
       throw error;
@@ -130,21 +123,13 @@ export const algoliaService = {
     headers?: Record<string, string>;
   }): Promise<SearchResponse<AlgoliaDocument>> {
     try {
-      const basicParams = {
-        query,
-        attributesToRetrieve: ['*'],
-        typoTolerance: true,
-        queryType: 'prefixAll' as QueryType,
-        removeStopWords: true,
-        ignorePlurals: true,
+      const searchOptions: SearchOptions = {
+        ...DEFAULT_SEARCH_PARAMS,
+        ...options,
         optionalWords: query.split(' '),
-        removeWordsIfNoResults: 'allOptional' as RemoveWordsIfNoResults
       };
 
-      return client.search<AlgoliaDocument>([{
-        indexName: DOCUMENTS_INDEX,
-        params: basicParams
-      }]);
+      return index.search<AlgoliaDocument>(query, searchOptions);
     } catch (error) {
       console.error('Failed to search documents in Algolia:', error);
       throw error;

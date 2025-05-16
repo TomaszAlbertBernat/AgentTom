@@ -1,12 +1,10 @@
 import {embed, generateText, generateObject, streamText} from 'ai';
-import {openai} from '@ai-sdk/openai';
 import OpenAI, { toFile } from 'openai';
 import {type CompletionConfig} from '../../types/llm';
 import type {CoreMessage} from 'ai';
 import type {ChatCompletion} from 'openai/resources/chat/completions';
 import {tempFile} from './upload.service';
 import {providers} from '../../config/llm.config';
-import {anthropic} from '@ai-sdk/anthropic';
 
 const createBaseConfig = ({model = 'gpt-4o', messages, temperature = 0.7, max_tokens = 16384, user}: CompletionConfig) => {
   const provider = Object.entries(providers).find(([_, models]) => 
@@ -18,12 +16,8 @@ const createBaseConfig = ({model = 'gpt-4o', messages, temperature = 0.7, max_to
     throw new Error(`Model ${model} not found in configuration`);
   }
 
-  const aiModel = provider === 'anthropic' 
-    ? anthropic(modelSpec.id)
-    : openai(modelSpec.id);
-
   return {
-    model: aiModel,
+    model: modelSpec.id,
     messages: messages as CoreMessage[],
     temperature,
     max_tokens: Math.min(max_tokens, modelSpec.maxOutput),
@@ -88,7 +82,7 @@ export const completion = {
 
 export const embedding = async (text: string) => {
   const {embedding} = await embed({
-    model: openai.embedding('text-embedding-3-large'),
+    model: 'text-embedding-3-large',
     value: text
   });
 
