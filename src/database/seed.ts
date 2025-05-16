@@ -15,12 +15,12 @@ const categories = memory_categories;
 const users = [
   {
     uuid: uuidv4(),
-    name: 'Default User',
+    name: 'Test User',
     email: 'user@example.com',
     token: process.env.API_KEY, // random token for auth
     active: true,
     phone: '+1234567890', // placeholder phone
-    context: 'default user',
+    context: 'test user',
     environment: JSON.stringify({
       location: 'Default Location',
       time: new Date().toISOString(),
