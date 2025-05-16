@@ -1,4 +1,4 @@
-import { Center, Spinner, Text, VStack } from '@chakra-ui/react';
+import './Loading.css';
 
 interface LoadingProps {
   message?: string;
@@ -6,17 +6,11 @@ interface LoadingProps {
 
 export const Loading = ({ message = 'Loading...' }: LoadingProps) => {
   return (
-    <Center h="100vh">
-      <VStack spacing={4}>
-        <Spinner
-          thickness="4px"
-          speed="0.65s"
-          emptyColor="gray.200"
-          color="blue.500"
-          size="xl"
-        />
-        <Text>{message}</Text>
-      </VStack>
-    </Center>
+    <div className="loading-container">
+      <div className="loading-content">
+        <div className="spinner"></div>
+        <p className="loading-message">{message}</p>
+      </div>
+    </div>
   );
 }; 

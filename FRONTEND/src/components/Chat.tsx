@@ -1,18 +1,10 @@
 import { useState, useEffect, useRef, ChangeEvent, KeyboardEvent } from 'react';
-import {
-  Box,
-  VStack,
-  Input,
-  Button,
-  Text,
-  Flex,
-  IconButton,
-} from '@chakra-ui/react';
 import { FiSettings, FiMoon, FiSun } from 'react-icons/fi';
 import { conversationService } from '../services/api';
 import { Message } from '../types/api';
 import { useChatStore } from '../store/chatStore';
 import { useSettingsStore } from '../store/settingsStore';
+import './Chat.css';
 
 type FontSize = 'small' | 'medium' | 'large';
 
@@ -86,85 +78,54 @@ export const Chat = () => {
     setIsDarkMode(!isDarkMode);
   };
 
-  const fontSizeMap: Record<FontSize, string> = {
-    small: 'sm',
-    medium: 'md',
-    large: 'lg',
-  };
+  const fontSizeClass = `font-${fontSize as FontSize}`;
 
   return (
-    <Box maxW="4xl" mx="auto" mt={8} p={4}>
-      <Flex justify="space-between" mb={4}>
-        <Box>
-          <IconButton
-            aria-label="Settings"
-            variant="ghost"
-            onClick={handleClearChat}
-            mr={2}
-          >
+    <div className={`chat-container ${isDarkMode ? 'dark' : ''}`}>
+      <div className="chat-header">
+        <div>
+          <button className="icon-button" onClick={handleClearChat}>
             <FiSettings />
-          </IconButton>
-          <IconButton
-            aria-label="Toggle theme"
-            variant="ghost"
-            onClick={handleToggleTheme}
-          >
+          </button>
+          <button className="icon-button" onClick={handleToggleTheme}>
             {isDarkMode ? <FiSun /> : <FiMoon />}
-          </IconButton>
-        </Box>
-      </Flex>
+          </button>
+        </div>
+      </div>
 
-      <VStack gap={4} align="stretch" h="80vh">
-        <Box
-          flex={1}
-          overflowY="auto"
-          p={4}
-          borderWidth={1}
-          borderRadius="lg"
-          bg={isDarkMode ? 'gray.700' : 'gray.50'}
-        >
+      <div className="chat-messages-container">
+        <div className="messages-box">
           {messages.map((message: Message) => (
-            <Flex
+            <div
               key={message.id}
-              justify={message.role === 'user' ? 'flex-end' : 'flex-start'}
-              mb={4}
+              className={`message-wrapper ${message.role}`}
             >
-              <Box
-                maxW="70%"
-                p={3}
-                borderRadius="lg"
-                bg={message.role === 'user' ? 'blue.500' : isDarkMode ? 'gray.600' : 'white'}
-                color={message.role === 'user' ? 'white' : 'inherit'}
-                boxShadow="sm"
-              >
-                <Text fontSize={fontSizeMap[fontSize as FontSize]} whiteSpace="pre-wrap">
-                  {message.content}
-                </Text>
-              </Box>
-            </Flex>
+              <div className={`message-bubble ${message.role} ${fontSizeClass}`}>
+                {message.content}
+              </div>
+            </div>
           ))}
           <div ref={messagesEndRef} />
-        </Box>
-        <Flex>
-          <Input
+        </div>
+        
+        <div className="input-container">
+          <input
+            className={`chat-input ${fontSizeClass}`}
             value={input}
             onChange={handleInputChange}
             onKeyPress={handleKeyPress}
             placeholder="Type your message..."
             disabled={isLoading}
-            fontSize={fontSizeMap[fontSize as FontSize]}
           />
-          <Button
-            ml={2}
-            colorScheme="blue"
+          <button
+            className="send-button"
             onClick={handleSend}
-            loading={isLoading}
-            disabled={!input.trim()}
+            disabled={!input.trim() || isLoading}
           >
-            Send
-          </Button>
-        </Flex>
-      </VStack>
-    </Box>
+            {isLoading ? 'Sending...' : 'Send'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }; 

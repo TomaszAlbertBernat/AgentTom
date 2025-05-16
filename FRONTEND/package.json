@@ -10,17 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@emotion/react": "^11.11.3",
-    "@emotion/styled": "^11.11.0",
+    "@types/uuid": "^10.0.0",
     "axios": "^1.6.7",
-    "framer-motion": "^11.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
+    "uuid": "^11.1.0",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
-    "@chakra-ui/react": "^3.18.0",
     "@types/react": "^18.3.21",
     "@types/react-dom": "^18.3.7",
     "@typescript-eslint/eslint-plugin": "^6.14.0",

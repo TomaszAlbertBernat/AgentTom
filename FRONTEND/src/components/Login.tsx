@@ -1,74 +1,70 @@
 import { useState } from 'react';
-import {
-  Box,
-  Button,
-  FormControl,
-  FormLabel,
-  Input,
-  VStack,
-  Text,
-  useToast,
-} from '@chakra-ui/react';
 import { useAuthStore } from '../store/authStore';
+import './Login.css';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { login, isLoading, error } = useAuthStore();
-  const toast = useToast();
+  const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await login(email, password);
-      toast({
-        title: 'Login successful',
-        status: 'success',
-        duration: 3000,
-      });
+      setToastMessage({ message: 'Login successful', type: 'success' });
+      setTimeout(() => setToastMessage(null), 3000);
     } catch (err) {
-      toast({
-        title: 'Login failed',
-        description: error || 'Please check your credentials',
-        status: 'error',
-        duration: 5000,
+      setToastMessage({ 
+        message: error || 'Please check your credentials', 
+        type: 'error' 
       });
+      setTimeout(() => setToastMessage(null), 5000);
     }
   };
 
   return (
-    <Box maxW="md" mx="auto" mt={8} p={6} borderWidth={1} borderRadius="lg">
-      <form onSubmit={handleSubmit}>
-        <VStack spacing={4}>
-          <Text fontSize="2xl" fontWeight="bold">
-            Login
-          </Text>
-          <FormControl isRequired>
-            <FormLabel>Email</FormLabel>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </FormControl>
-          <FormControl isRequired>
-            <FormLabel>Password</FormLabel>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </FormControl>
-          <Button
-            type="submit"
-            colorScheme="blue"
-            width="full"
-            isLoading={isLoading}
-          >
-            Login
-          </Button>
-        </VStack>
+    <div className="login-container">
+      {toastMessage && (
+        <div className={`toast ${toastMessage.type}`}>
+          {toastMessage.message}
+        </div>
+      )}
+      <form className="login-form" onSubmit={handleSubmit}>
+        <h2 className="login-title">Login</h2>
+        
+        <div className="form-group">
+          <label className="form-label" htmlFor="email">Email</label>
+          <input
+            id="email"
+            className="form-input"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        
+        <div className="form-group">
+          <label className="form-label" htmlFor="password">Password</label>
+          <input
+            id="password"
+            className="form-input"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        
+        <button
+          className="login-button"
+          type="submit"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Logging in...' : 'Login'}
+        </button>
       </form>
-    </Box>
+    </div>
   );
 }; 

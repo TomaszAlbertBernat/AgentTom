@@ -26,7 +26,7 @@ bun install
 
 2. Create a `.env` file in the root directory with the following variables:
 ```env
-VITE_API_URL=http://localhost:3000
+VITE_API_URL=http://localhost:8080
 ```
 
 3. Start the development server:

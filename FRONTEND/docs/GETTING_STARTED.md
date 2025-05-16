@@ -28,8 +28,8 @@ cp .env-example .env
 
 4. Configure environment variables in `.env`:
 ```env
-VITE_API_URL=http://localhost:3000
-VITE_WS_URL=ws://localhost:3000
+VITE_API_URL=http://localhost:8080
+VITE_WS_URL=ws://localhost:8080
 ```
 
 ## Development

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { AuthResponse, Conversation, Message, User } from '../types/api';
 
-const API_URL = 'http://localhost:3000';
+const API_URL = 'http://localhost:8080';
 
 const api = axios.create({
   baseURL: API_URL,
