@@ -6,18 +6,25 @@ import {
   Button,
   Text,
   Flex,
-  useToast,
+  IconButton,
 } from '@chakra-ui/react';
+import { FiSettings, FiMoon, FiSun } from 'react-icons/fi';
 import { conversationService } from '../services/api';
 import { Message } from '../types/api';
+import { useChatStore } from '../store/chatStore';
+import { useSettingsStore } from '../store/settingsStore';
+
+type FontSize = 'small' | 'medium' | 'large';
 
 export const Chat = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string>();
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const toast = useToast();
+  const { fontSize } = useSettingsStore();
+
+  const { messages, currentConversationId, addMessage, setConversationId, clearMessages } =
+    useChatStore();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -37,12 +44,12 @@ export const Chat = () => {
       created_at: new Date().toISOString(),
     };
 
-    setMessages((prev: Message[]) => [...prev, userMessage]);
+    addMessage(userMessage);
     setInput('');
     setIsLoading(true);
 
     try {
-      const response = await conversationService.sendMessage(input, conversationId);
+      const response = await conversationService.sendMessage(input, currentConversationId || undefined);
       setConversationId(response.conversation_id);
 
       const aiMessage: Message = {
@@ -52,14 +59,9 @@ export const Chat = () => {
         created_at: new Date().toISOString(),
       };
 
-      setMessages((prev: Message[]) => [...prev, aiMessage]);
+      addMessage(aiMessage);
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to send message',
-        status: 'error',
-        duration: 5000,
-      });
+      console.error('Failed to send message:', error);
     } finally {
       setIsLoading(false);
     }
@@ -76,16 +78,50 @@ export const Chat = () => {
     }
   };
 
+  const handleClearChat = () => {
+    clearMessages();
+  };
+
+  const handleToggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+  };
+
+  const fontSizeMap: Record<FontSize, string> = {
+    small: 'sm',
+    medium: 'md',
+    large: 'lg',
+  };
+
   return (
     <Box maxW="4xl" mx="auto" mt={8} p={4}>
-      <VStack spacing={4} align="stretch" h="80vh">
+      <Flex justify="space-between" mb={4}>
+        <Box>
+          <IconButton
+            aria-label="Settings"
+            variant="ghost"
+            onClick={handleClearChat}
+            mr={2}
+          >
+            <FiSettings />
+          </IconButton>
+          <IconButton
+            aria-label="Toggle theme"
+            variant="ghost"
+            onClick={handleToggleTheme}
+          >
+            {isDarkMode ? <FiSun /> : <FiMoon />}
+          </IconButton>
+        </Box>
+      </Flex>
+
+      <VStack gap={4} align="stretch" h="80vh">
         <Box
           flex={1}
           overflowY="auto"
           p={4}
           borderWidth={1}
           borderRadius="lg"
-          bg="gray.50"
+          bg={isDarkMode ? 'gray.700' : 'gray.50'}
         >
           {messages.map((message: Message) => (
             <Flex
@@ -97,11 +133,13 @@ export const Chat = () => {
                 maxW="70%"
                 p={3}
                 borderRadius="lg"
-                bg={message.role === 'user' ? 'blue.500' : 'white'}
-                color={message.role === 'user' ? 'white' : 'black'}
+                bg={message.role === 'user' ? 'blue.500' : isDarkMode ? 'gray.600' : 'white'}
+                color={message.role === 'user' ? 'white' : 'inherit'}
                 boxShadow="sm"
               >
-                <Text whiteSpace="pre-wrap">{message.content}</Text>
+                <Text fontSize={fontSizeMap[fontSize as FontSize]} whiteSpace="pre-wrap">
+                  {message.content}
+                </Text>
               </Box>
             </Flex>
           ))}
@@ -114,12 +152,13 @@ export const Chat = () => {
             onKeyPress={handleKeyPress}
             placeholder="Type your message..."
             disabled={isLoading}
+            fontSize={fontSizeMap[fontSize as FontSize]}
           />
           <Button
             ml={2}
             colorScheme="blue"
             onClick={handleSend}
-            isLoading={isLoading}
+            loading={isLoading}
             disabled={!input.trim()}
           >
             Send
