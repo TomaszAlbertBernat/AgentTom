@@ -1,0 +1,21 @@
+code, kbd, samp, pre { color: color(srgb 0.3116 0.82 0.4956); }
+
+.output {
+    max-height: 400px;
+}
+
+.apikey {
+    max-width: 200px; text-overflow: ellipsis;
+}
+
+.titlebar {
+    height: 20px;
+    user-select: none;
+    cursor: grab;
+    display: flex;
+    justify-content: flex-end;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+}
