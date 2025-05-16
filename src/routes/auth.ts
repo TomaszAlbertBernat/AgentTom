@@ -60,6 +60,9 @@ const createOAuth2Client = () => {
   );
 };
 
+// Initialize OAuth2 client
+const oauth2Client = createOAuth2Client();
+
 const sessionService = {
   create: async (data: z.infer<typeof SessionSchema>) => {
     const session: SessionData = {
@@ -147,7 +150,7 @@ const registerSchema = loginSchema.extend({
 });
 
 // JWT middleware
-const jwtMiddleware = async (c: any, next: any) => {
+export const jwtMiddleware = async (c: any, next: any) => {
   const authHeader = c.req.header('authorization');
   if (!authHeader) {
     return c.json({ error: 'Missing Authorization header' }, 401);

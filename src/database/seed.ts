@@ -4,8 +4,7 @@ import * as schema from '../schema';
 import {v4 as uuidv4} from 'uuid';
 import { memory_categories } from '../config/memory.config';
 import {type NewMessage} from '../schema/message';
-import { db } from './index';
-import { tools } from '../schema/tools';
+import { tools as schemaTools } from '../schema/tools';
 
 const sqlite = new Database('./agi.db');
 const db = drizzle(sqlite, {schema});
@@ -180,7 +179,7 @@ const seedTools = async () => {
   ];
 
   for (const tool of initialTools) {
-    await db.insert(tools).values(tool);
+    await db.insert(schemaTools).values(tool);
   }
 
   console.log('Tools seeded successfully');
@@ -190,7 +189,7 @@ const main = async () => {
   console.log('🌱 Seeding...');
 
   try {
-    await db.insert(schema.tools).values(tools);
+    await seedTools();
     console.log('✅ Tools seeded successfully');
 
     await db.insert(schema.categories).values(categories);
@@ -213,8 +212,6 @@ const main = async () => {
 
     await db.insert(schema.conversationMemories).values(conversationMemories);
     console.log('✅ Conversation Memories seeded successfully');
-
-    await seedTools();
   } catch (error) {
     console.error('❌ Error seeding:', error);
   }

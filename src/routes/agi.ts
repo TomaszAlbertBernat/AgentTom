@@ -6,8 +6,26 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from '../database';
 import { conversations } from '../schema/conversations';
 import { messages } from '../schema/messages';
+import { eq } from 'drizzle-orm';
 
-const agi = new Hono();
+// Import JWT middleware
+import { jwtMiddleware } from '../routes/auth';
+
+// Define the JWT payload type
+interface JwtPayload {
+  user_id: string;
+  [key: string]: any;
+}
+
+// Define an extended Context type
+interface AppContext {
+  jwtPayload: JwtPayload;
+}
+
+const agi = new Hono<{ Variables: AppContext }>();
+
+// Apply JWT middleware to all routes
+agi.use('*', jwtMiddleware);
 
 // Initialize OpenAI
 const openai = new OpenAI({
