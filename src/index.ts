@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server';
 import { app } from './app';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { sqlite } from './database';
+import { env, logServiceStatus } from './config/env.config';
 
 // Run migrations
 try {
@@ -17,9 +18,14 @@ try {
   }
 }
 
+// Log service configuration status
+logServiceStatus();
+
 // Start server
-const port = process.env.PORT || 3000;
-console.log(`Server is running on port ${port}`);
+const port = env.PORT;
+console.log(`🚀 Server is running on port ${port}`);
+console.log(`🌐 App URL: ${env.APP_URL}`);
+console.log(`🔧 Environment: ${env.NODE_ENV}`);
 
 serve({
   fetch: app.fetch,

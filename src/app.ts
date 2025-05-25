@@ -10,6 +10,7 @@ import { HTTPException } from 'hono/http-exception';
 import { authRoutes } from './routes/auth';
 import { agiRoutes } from './routes/agi';
 import { toolRoutes } from './routes/tools';
+import { users_router } from './routes/users';
 
 // Create Hono app
 const app = new Hono();
@@ -57,5 +58,6 @@ app.get('/health', (c) => c.json({ status: 'ok' }));
 app.route('/auth', authRoutes);
 app.route('/agi', agiRoutes);
 app.route('/tools', toolRoutes);
+app.route('/users', users_router);
 
 export { app }; 

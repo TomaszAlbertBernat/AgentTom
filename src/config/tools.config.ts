@@ -7,12 +7,12 @@ import { linearService } from '../services/tools/linear.service';
 import { mapService } from '../services/tools/map.service';
 import { cryptoService } from '../services/tools/crypto.service';
 import { webService } from '../services/tools/web.service';
+import { imageService } from '../services/tools/image.service';
 import { calendarService } from '../services/agent/calendar.service';
-import { LangfuseSpanClient } from 'langfuse';
 import type { DocumentType } from '../services/agent/document.service';
 
 interface ToolService {
-  execute: (action: string, payload: unknown, span?: LangfuseSpanClient) => Promise<DocumentType>;
+  execute: (action: string, payload: unknown, span?: any) => Promise<DocumentType>;
 }
 
 export const toolsMap: Record<string, ToolService> = {
@@ -25,6 +25,7 @@ export const toolsMap: Record<string, ToolService> = {
   map: mapService,
   crypto: cryptoService,
   web: webService,
+  image: imageService,
   calendar: calendarService
 } as const;
 
