@@ -1,23 +1,34 @@
 import { z } from 'zod';
 import { LinearClient, Issue, Project, IssueConnection, WorkflowState } from '@linear/sdk';
-import { LangfuseSpanClient } from 'langfuse';
+import { LangfuseSpanClient } from '../../types/langfuse';
 import { stateManager } from '../agent/state.service';
 import { documentService } from '../agent/document.service';
 import type { DocumentType } from '../agent/document.service';
 import { IssueFilter } from '@linear/sdk/dist/_generated_documents';
 
 
-const DEFAULT_TEAM_ID = process.env.LINEAR_DEFAULT_TEAM_ID!;
-const DEFAULT_ASSIGNEE_ID = process.env.LINEAR_DEFAULT_ASSIGNEE_ID!;
+const DEFAULT_TEAM_ID = process.env.LINEAR_DEFAULT_TEAM_ID || '';
+const DEFAULT_ASSIGNEE_ID = process.env.LINEAR_DEFAULT_ASSIGNEE_ID || '';
 
-let linearClient: LinearClient;
-try {
-  linearClient = new LinearClient({ 
-    apiKey: process.env.LINEAR_API_KEY! 
-  });
-} catch (error) {
-  console.error('Failed to initialize Linear client. Check LINEAR_API_KEY in .env or remove linear.service.ts from tools.config.ts and ai.service.ts');
+let linearClient: LinearClient | null = null;
+
+if (process.env.LINEAR_API_KEY) {
+  try {
+    linearClient = new LinearClient({ 
+      apiKey: process.env.LINEAR_API_KEY 
+    });
+  } catch (error) {
+    console.error('Failed to initialize Linear client:', error);
+  }
 }
+
+// Helper function to check if Linear is available
+const ensureLinearClient = (): LinearClient => {
+  if (!linearClient) {
+    throw new Error('Linear not configured. Please set LINEAR_API_KEY in your environment variables.');
+  }
+  return linearClient;
+};
 
 const issueSchema = z.object({
   teamId: z.string().optional().default(DEFAULT_TEAM_ID),
@@ -176,8 +187,9 @@ ${state.description ? `Description: ${state.description}` : ''}`
     try {
       span?.event({ name: 'linear_get_context_maps_start' });
 
+      const client = ensureLinearClient();
       const [projects, states] = await Promise.all([
-        linearClient.projects(),
+        client.projects(),
         linearService.fetchTeamStates(DEFAULT_TEAM_ID, span)
       ]);
 

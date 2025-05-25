@@ -6,7 +6,8 @@
     "start": "bun run src/index.ts",
     "generate": "drizzle-kit generate",
     "migrate": "bun run src/database/migrate.ts",
-    "seed": "bun run src/database/seed.ts"
+    "seed": "bun run src/database/seed.ts",
+    "setup:linear": "bun run scripts/setup-linear.ts"
   },
   "dependencies": {
     "@googlemaps/google-maps-services-js": "^3.3.42",

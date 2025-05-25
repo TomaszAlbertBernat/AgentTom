@@ -11,6 +11,7 @@ import { authRoutes } from './routes/auth';
 import { agiRoutes } from './routes/agi';
 import { toolRoutes } from './routes/tools';
 import { users_router } from './routes/users';
+import linearRoutes from './routes/linear';
 
 // Create Hono app
 const app = new Hono();
@@ -59,5 +60,6 @@ app.route('/auth', authRoutes);
 app.route('/agi', agiRoutes);
 app.route('/tools', toolRoutes);
 app.route('/users', users_router);
+app.route('/linear', linearRoutes);
 
 export { app }; 

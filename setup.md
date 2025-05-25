@@ -72,9 +72,20 @@ The application will show you which services are configured when it starts. You 
 1. Go to [Linear Settings > API](https://linear.app/settings/api)
 2. Create a personal API key
 3. Add to `.env`: `LINEAR_API_KEY=lin_api_...`
-4. Get team and assignee IDs from the API endpoints:
-   - `/api/tools/linear/teams`
-   - `/api/tools/linear/users`
+4. Run the automatic setup script:
+   ```bash
+   bun run setup:linear
+   ```
+   This will automatically:
+   - Fetch your teams and users
+   - Recommend default team and assignee
+   - Update your `.env` file with the required IDs
+
+   **Manual Setup Alternative:**
+   - Visit `/api/linear/setup` after starting the app
+   - Or use individual endpoints:
+     - `/api/linear/teams` - Get team IDs
+     - `/api/linear/users` - Get user IDs
 
 ### Google Services (Optional)
 1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)

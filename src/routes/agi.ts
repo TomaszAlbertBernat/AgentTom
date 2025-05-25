@@ -73,16 +73,16 @@ agi.post('/messages', zValidator('json', messageSchema), async (c) => {
   // Store user message
   const user_message_id = uuidv4();
   await db.insert(messages).values({
-    id: user_message_id,
-    conversation_id: current_conversation_id,
+    uuid: user_message_id,
+    conversation_uuid: current_conversation_id,
     role: 'user',
+    content_type: 'text',
     content,
-    created_at: new Date(),
   });
 
   // Get conversation history
   const history = await db.query.messages.findMany({
-    where: (messages, { eq }) => eq(messages.conversation_id, current_conversation_id),
+    where: (messages, { eq }) => eq(messages.conversation_uuid, current_conversation_id),
     orderBy: (messages, { asc }) => [asc(messages.created_at)],
   });
 
@@ -105,11 +105,11 @@ agi.post('/messages', zValidator('json', messageSchema), async (c) => {
   // Store AI response
   const ai_message_id = uuidv4();
   await db.insert(messages).values({
-    id: ai_message_id,
-    conversation_id: current_conversation_id,
+    uuid: ai_message_id,
+    conversation_uuid: current_conversation_id,
     role: 'assistant',
+    content_type: 'text',
     content: ai_response,
-    created_at: new Date(),
   });
 
   // Update conversation timestamp
@@ -142,7 +142,7 @@ agi.get('/conversations/:id/messages', async (c) => {
 
   // Get messages
   const history = await db.query.messages.findMany({
-    where: (messages, { eq }) => eq(messages.conversation_id, conversation_id),
+    where: (messages, { eq }) => eq(messages.conversation_uuid, conversation_id),
     orderBy: (messages, { asc }) => [asc(messages.created_at)],
   });
 
