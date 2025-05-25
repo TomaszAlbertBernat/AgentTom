@@ -79,7 +79,7 @@ export const getSpotifyTokens = async (user_uuid: string): Promise<{
   return {
     access_token: user.access_token ?? undefined,
     refresh_token: user.refresh_token ?? undefined,
-    expires_at: user.expires_at
+    expires_at: user.expires_at ?? undefined
   };
 };
 
@@ -122,7 +122,7 @@ export const getGoogleTokens = async (user_uuid: string): Promise<{
   return {
     access_token: user.access_token ?? undefined,
     refresh_token: user.refresh_token ?? undefined,
-    expires_at: user.expires_at
+    expires_at: user.expires_at ?? undefined
   };
 };
 

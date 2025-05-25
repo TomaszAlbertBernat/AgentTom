@@ -4,7 +4,10 @@ import { logger } from './logger.service';
 
 const vectorLogger = logger.child('VECTOR_SERVICE');
 
-// Updated validation schemas
+/**
+ * Validation schema for search filters applied to vector searches
+ * Defines the structure for filtering vector search results
+ */
 const SearchFiltersSchema = z.object({
   source_uuid: z.string().uuid().optional(),
   source: z.string().optional(),
@@ -13,6 +16,10 @@ const SearchFiltersSchema = z.object({
   subcategory: z.string().optional()
 });
 
+/**
+ * Validation schema for point payloads stored in the vector database
+ * Ensures consistent data structure for all vector points
+ */
 const PointPayloadSchema = z.object({
   document_uuid: z.string().uuid(),
   source_uuid: z.string(),
@@ -23,12 +30,28 @@ const PointPayloadSchema = z.object({
   updated_at: z.string()
 });
 
+/**
+ * Type definition for search filters used in vector operations
+ * All fields are optional to allow flexible filtering
+ */
 type SearchFilters = z.infer<typeof SearchFiltersSchema>;
+
+/**
+ * Type definition for point payload data structure
+ * Represents the metadata and content associated with each vector point
+ */
 type PointPayload = z.infer<typeof PointPayloadSchema>;
 
+/**
+ * Interface representing a vector search result
+ * Contains the point ID, similarity score, and associated payload data
+ */
 interface VectorSearchResult {
+  /** Unique identifier for the vector point */
   id: string;
+  /** Similarity score between 0 and 1, where 1 is most similar */
   score: number;
+  /** Associated metadata and content for the vector point */
   payload: PointPayload;
 }
 
@@ -38,9 +61,26 @@ const qdrant = new QdrantClient({
   apiKey: process.env.QDRANT_API_KEY
 });
 
+/** The name of the Qdrant collection used for vector storage */
 const COLLECTION_NAME = process.env.QDRANT_INDEX || 'alice';
+
+/** The dimensionality of vectors stored in the collection (OpenAI ada-002 embedding size) */
 const VECTOR_SIZE = 3072;
 
+/**
+ * Formats search filters into Qdrant-compatible filter structure
+ * Converts user-friendly filter objects into the format expected by Qdrant
+ * 
+ * @param filters - The search filters to format
+ * @returns Qdrant-compatible filter object or undefined if no filters
+ * 
+ * @example
+ * ```typescript
+ * const filters = { source: 'document', content_type: 'chunk' };
+ * const qdrantFilter = formatSearchFilters(filters);
+ * // Returns: { must: [{ key: 'source', match: { value: 'document' } }, ...] }
+ * ```
+ */
 const formatSearchFilters = (filters: SearchFilters) => {
   if (!filters) return undefined;
   
@@ -66,7 +106,54 @@ const formatSearchFilters = (filters: SearchFilters) => {
   return must.length > 0 ? { must } : undefined;
 };
 
+/**
+ * Vector Database Service
+ * 
+ * Provides high-level operations for managing and searching vector embeddings in Qdrant.
+ * This service handles document embeddings for semantic search, content similarity,
+ * and vector-based retrieval operations.
+ * 
+ * Key features:
+ * - Vector similarity search with filtering
+ * - Point management (create, update, delete)
+ * - Collection initialization and indexing
+ * - Payload updates and batch operations
+ * 
+ * @example
+ * ```typescript
+ * // Initialize collection
+ * await vectorService.initializeCollection();
+ * 
+ * // Store a vector
+ * await vectorService.upsertPoint(embedding, {
+ *   document_uuid: 'doc-123',
+ *   source_uuid: 'source-456',
+ *   source: 'document',
+ *   text: 'Sample content',
+ *   metadata: { type: 'article' },
+ *   created_at: new Date().toISOString(),
+ *   updated_at: new Date().toISOString()
+ * });
+ * 
+ * // Search similar vectors
+ * const results = await vectorService.searchSimilar(queryEmbedding, {
+ *   source: 'document',
+ *   content_type: 'chunk'
+ * }, 10);
+ * ```
+ */
 export const vectorService = {
+  /**
+   * Initializes the Qdrant collection with proper configuration
+   * Creates the collection if it doesn't exist and sets up necessary indexes
+   * 
+   * @throws {Error} When collection initialization fails
+   * 
+   * @example
+   * ```typescript
+   * await vectorService.initializeCollection();
+   * ```
+   */
   async initializeCollection(): Promise<void> {
     try {
       const collections = await qdrant.getCollections();
@@ -103,6 +190,27 @@ export const vectorService = {
     }
   },
 
+  /**
+   * Inserts or updates a vector point in the collection
+   * 
+   * @param vector - The embedding vector (must be exactly VECTOR_SIZE dimensions)
+   * @param payload - The metadata and content associated with the vector
+   * @throws {Error} When vector size is incorrect or upsert operation fails
+   * 
+   * @example
+   * ```typescript
+   * const embedding = await getEmbedding('Some text content');
+   * await vectorService.upsertPoint(embedding, {
+   *   document_uuid: 'doc-123',
+   *   source_uuid: 'source-456',
+   *   source: 'document',
+   *   text: 'Some text content',
+   *   metadata: { category: 'article' },
+   *   created_at: new Date().toISOString(),
+   *   updated_at: new Date().toISOString()
+   * });
+   * ```
+   */
   async upsertPoint(
     vector: number[],
     payload: PointPayload
@@ -132,6 +240,17 @@ export const vectorService = {
     }
   },
 
+  /**
+   * Deletes vector points from the collection
+   * 
+   * @param document_uuids - Array of document UUIDs to delete
+   * @throws {Error} When deletion operation fails
+   * 
+   * @example
+   * ```typescript
+   * await vectorService.deletePoints(['doc-123', 'doc-456']);
+   * ```
+   */
   async deletePoints(document_uuids: string[]): Promise<void> {
     try {
       await qdrant.delete(COLLECTION_NAME, {
@@ -144,6 +263,29 @@ export const vectorService = {
     }
   },
 
+  /**
+   * Searches for similar vectors in the collection
+   * Performs cosine similarity search with optional filtering and score thresholding
+   * 
+   * @param vector - The query vector to search for (must be exactly VECTOR_SIZE dimensions)
+   * @param filters - Optional filters to apply to the search results
+   * @param limit - Maximum number of results to return (default: 10)
+   * @returns Array of search results sorted by similarity score (highest first)
+   * @throws {Error} When search operation fails
+   * 
+   * @example
+   * ```typescript
+   * const queryEmbedding = await getEmbedding('search query');
+   * const results = await vectorService.searchSimilar(queryEmbedding, {
+   *   source: 'document',
+   *   content_type: 'chunk'
+   * }, 5);
+   * 
+   * results.forEach(result => {
+   *   console.log(`Score: ${result.score}, Text: ${result.payload.text}`);
+   * });
+   * ```
+   */
   async searchSimilar(
     vector: number[],
     filters?: SearchFilters,
@@ -184,6 +326,19 @@ export const vectorService = {
     }
   },
 
+  /**
+   * Retrieves all points associated with a specific source UUID
+   * 
+   * @param source_uuid - The source UUID to filter by
+   * @param limit - Maximum number of points to return (default: 100)
+   * @returns Array of vector points from the specified source
+   * @throws {Error} When retrieval operation fails
+   * 
+   * @example
+   * ```typescript
+   * const sourcePoints = await vectorService.getPointsBySource('source-123', 50);
+   * ```
+   */
   async getPointsBySource(
     source_uuid: string,
     limit = 100
@@ -210,6 +365,21 @@ export const vectorService = {
     }
   },
 
+  /**
+   * Updates the payload of an existing vector point without changing the vector
+   * 
+   * @param document_uuid - The UUID of the document to update
+   * @param payload_update - Partial payload data to update
+   * @throws {Error} When payload update operation fails
+   * 
+   * @example
+   * ```typescript
+   * await vectorService.updatePointPayload('doc-123', {
+   *   metadata: { updated: true, category: 'updated-article' },
+   *   updated_at: new Date().toISOString()
+   * });
+   * ```
+   */
   async updatePointPayload(
     document_uuid: string,
     payload_update: Partial<PointPayload>
@@ -226,6 +396,29 @@ export const vectorService = {
     }
   },
 
+  /**
+   * Updates both the vector and payload of an existing point
+   * Completely replaces the existing point with new data
+   * 
+   * @param document_uuid - The UUID of the document to update
+   * @param vector - The new embedding vector (must be exactly VECTOR_SIZE dimensions)
+   * @param payload - The new payload data
+   * @throws {Error} When vector size is incorrect or update operation fails
+   * 
+   * @example
+   * ```typescript
+   * const newEmbedding = await getEmbedding('Updated content');
+   * await vectorService.updatePoint('doc-123', newEmbedding, {
+   *   document_uuid: 'doc-123',
+   *   source_uuid: 'source-456',
+   *   source: 'document',
+   *   text: 'Updated content',
+   *   metadata: { version: 2 },
+   *   created_at: originalCreatedAt,
+   *   updated_at: new Date().toISOString()
+   * });
+   * ```
+   */
   async updatePoint(
     document_uuid: string,
     vector: number[],
