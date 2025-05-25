@@ -131,7 +131,6 @@ The main logic has two modes: fast-track and thinking. If the query is classifie
 
 AgenTTom is available at `http://localhost:8080`. The main endpoint is `/api/agi/chat`, which is compatible with OpenAI's chat completions API. You can use:
 
-- [Alice App](https://heyalice.app/) for macOS / Windows
 - Siri Shortcuts for iOS (iPhone and Apple Watch)
 
 <img src="docs/images/custom.png" width="600" style="border-radius: 6px; margin: 20px 0">
