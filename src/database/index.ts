@@ -1,9 +1,9 @@
 import { drizzle } from 'drizzle-orm/libsql';
 import { createClient } from '@libsql/client';
 import * as schema from '../schema/users';
-import * as conversationsSchema from '../schema/conversations';
-import * as messagesSchema from '../schema/messages';
-import * as toolsSchema from '../schema/tools';
+import * as conversationsSchema from '../schema/conversation';
+import * as messagesSchema from '../schema/message';
+import * as toolsSchema from '../schema/tool';
 import * as toolExecutionsSchema from '../schema/tool_executions';
 import { drizzle as drizzleSqlite } from 'drizzle-orm/bun-sqlite';
 import { Database } from 'bun:sqlite';

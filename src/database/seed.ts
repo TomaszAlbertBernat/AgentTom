@@ -4,7 +4,7 @@ import * as schema from '../schema';
 import {v4 as uuidv4} from 'uuid';
 import { memory_categories } from '../config/memory.config';
 import {type NewMessage} from '../schema/message';
-import { tools as schemaTools } from '../schema/tools';
+import { tools as schemaTools } from '../schema/tool';
 
 const sqlite = new Database('./agi.db');
 const db = drizzle(sqlite, {schema});
@@ -113,68 +113,22 @@ const conversationMemories = [
 const seedTools = async () => {
   const initialTools = [
     {
-      id: uuidv4(),
+      uuid: uuidv4(),
       name: 'weather',
       description: 'Get weather information for a location',
-      parameters: JSON.stringify({
-        type: 'object',
-        properties: {
-          location: {
-            type: 'string',
-            description: 'The location to get weather for',
-          },
-          units: {
-            type: 'string',
-            enum: ['metric', 'imperial'],
-            description: 'The units to use for temperature',
-          },
-        },
-        required: ['location'],
-      }),
-      created_at: new Date(),
-      updated_at: new Date(),
+      instruction: 'Use this tool to get current weather conditions for any location.',
     },
     {
-      id: uuidv4(),
+      uuid: uuidv4(),
       name: 'calculator',
       description: 'Perform mathematical calculations',
-      parameters: JSON.stringify({
-        type: 'object',
-        properties: {
-          expression: {
-            type: 'string',
-            description: 'The mathematical expression to evaluate',
-          },
-        },
-        required: ['expression'],
-      }),
-      created_at: new Date(),
-      updated_at: new Date(),
+      instruction: 'Use this tool to evaluate mathematical expressions and perform calculations.',
     },
     {
-      id: uuidv4(),
+      uuid: uuidv4(),
       name: 'translator',
       description: 'Translate text between languages',
-      parameters: JSON.stringify({
-        type: 'object',
-        properties: {
-          text: {
-            type: 'string',
-            description: 'The text to translate',
-          },
-          target_language: {
-            type: 'string',
-            description: 'The target language code',
-          },
-          source_language: {
-            type: 'string',
-            description: 'The source language code (optional)',
-          },
-        },
-        required: ['text', 'target_language'],
-      }),
-      created_at: new Date(),
-      updated_at: new Date(),
+      instruction: 'Use this tool to translate text from one language to another.',
     },
   ];
 

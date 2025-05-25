@@ -40,17 +40,16 @@ const messageSchema = z.object({
 
 // Create new conversation
 agi.post('/conversations', async (c) => {
-  const conversation_id = uuidv4();
+  const conversation_uuid = uuidv4();
   const user_id = c.get('jwtPayload').user_id;
 
   await db.insert(conversations).values({
-    id: conversation_id,
+    uuid: conversation_uuid,
     user_id,
-    created_at: new Date(),
-    updated_at: new Date(),
+    name: 'New Conversation',
   });
 
-  return c.json({ conversation_id });
+  return c.json({ conversation_id: conversation_uuid });
 });
 
 // Send message
@@ -63,10 +62,9 @@ agi.post('/messages', zValidator('json', messageSchema), async (c) => {
   if (!current_conversation_id) {
     current_conversation_id = uuidv4();
     await db.insert(conversations).values({
-      id: current_conversation_id,
+      uuid: current_conversation_id,
       user_id,
-      created_at: new Date(),
-      updated_at: new Date(),
+      name: 'Chat Conversation',
     });
   }
 
