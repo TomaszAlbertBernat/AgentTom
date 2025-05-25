@@ -1,6 +1,6 @@
 import type {State} from '../../types/state';
 
-export const prompt = (state: State, toolContext?: IDoc) => {
+export const prompt = (state: State) => {
   const task = state.interaction.tasks.find(t => t.uuid === state.config.current_task?.uuid);
   const action = task?.actions.find(a => a.uuid === state.config.current_action?.uuid);
   const tool = state.session.tools.find(t => t.uuid === action?.tool_uuid);
@@ -63,7 +63,7 @@ ${state.profile.ai_name}: {
 ${
   state.session.memories.length > 0
     ? state.session.memories
-        .map(memory => `<memory name="${memory.name}">${memory.document?.text || 'No content'}</memory>`)
+        .map(memory => `<memory name="${memory.name}">Memory available - content needs to be recalled</memory>`)
         .join('\n')
     : 'No memories recalled'
 }

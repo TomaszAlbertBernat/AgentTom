@@ -139,7 +139,7 @@ ${state.thoughts.tools?.length > 0 ? state.thoughts.tools.map(t => `<tool_query 
 </initial_thoughts_about_tools_needed>
 
 <memories name="already recalled memories">
-${state.session.memories?.length > 0 ? state.session.memories.map(memory => `<memory name="${memory.name}">${memory.document?.text || 'No memories available'}</memory>`).join('\n') : '<info>No memories available</info>'}
+${state.session.memories?.length > 0 ? state.session.memories.map(memory => `<memory name="${memory.name}">Memory available - use search_memory tool to recall content</memory>`).join('\n') : '<info>No memories available</info>'}
 </memories>
 
 <tools name="these are tools you can use">

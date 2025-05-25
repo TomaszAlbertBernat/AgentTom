@@ -37,7 +37,8 @@
     "html",
     "json",
     "txt",
-    "md"
+    "md",
+    "idoc"
   ],
   "ignorePaths": [
     "node_modules/**",

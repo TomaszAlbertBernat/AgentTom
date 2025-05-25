@@ -56,7 +56,11 @@ export const setInteractionState = async (request: ChatRequest) => {
       subcategory: subcategory || '',
       description: description || ''
     })),
-    memories
+    memories: memories.map(memory => ({
+      ...memory,
+      created_at: memory.created_at || '',
+      updated_at: memory.updated_at || ''
+    }))
   });
 
   stateManager.updateConfig({

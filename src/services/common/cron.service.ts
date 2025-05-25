@@ -13,7 +13,10 @@ interface CreateJobParams {
   type: 'cron' | 'scheduled' | 'recurring';
   schedule: string;
   task_uuid: string;
-  metadata?: Record<string, any>;
+  metadata?: {
+    description?: string;
+    [key: string]: any;
+  };
 }
 
 export const cronService = {
@@ -101,7 +104,7 @@ export const cronService = {
 
     //   console.log('Pending jobs:', pending_jobs);
 
-    //   console.log(`Found ${pending_jobs.length} pend÷śing jobs`);
+      console.log(`Found ${pending_jobs.length} pending jobs`);
 
       for (const job of pending_jobs) {
         console.log(`Processing job: ${job.uuid} (${job.name})`);
@@ -124,7 +127,9 @@ export const cronService = {
       const conversation_uuid = uuidv4();
       const task = await taskService.createTasks(conversation_uuid, [{
         name: job.name,
-        description: job.metadata?.description || '',
+        description: typeof job.metadata === 'string' 
+          ? (JSON.parse(job.metadata) as { description?: string })?.description || ''
+          : (job.metadata as { description?: string } | null)?.description || '',
         status: 'pending',
         uuid: job.task_uuid
       }]);
@@ -178,8 +183,8 @@ export const cronService = {
     try {
       const conversation_uuid = uuidv4();
       const metadata = typeof job.metadata === 'string' 
-        ? JSON.parse(job.metadata)
-        : job.metadata;
+        ? JSON.parse(job.metadata) as { description?: string; [key: string]: any }
+        : job.metadata as { description?: string; [key: string]: any } | null;
 
       // Create conversation first
       await conversationService.create({
@@ -191,7 +196,7 @@ export const cronService = {
       // Create task with proper data structure
       const task_data = [{
         name: job.name,
-        description: metadata?.description || '',
+        description: metadata?.description || job.name,
         status: 'pending' as const,
         uuid: null
       }];

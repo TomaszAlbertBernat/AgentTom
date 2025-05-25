@@ -27,14 +27,8 @@ const DocumentMetadataSchema = z.object({
   screenshots: z.array(z.string()).optional(),
   should_index: z.boolean().optional(),
   updated_at: z.string().optional(),
-  category: z.string().optional().refine(val => {
-    if (val === undefined) return true;
-    return val !== undefined || metadata.content_type !== 'memory';
-  }, { message: "Category is required when content_type is 'memory'" }),
-  subcategory: z.string().optional().refine(val => {
-    if (val === undefined) return true;
-    return val !== undefined || metadata.content_type !== 'memory';
-  }, { message: "Subcategory is required when content_type is 'memory'" })
+  category: z.string().optional(),
+  subcategory: z.string().optional()
 });
 
 export interface DocumentType extends Omit<Document, 'metadata'> {

@@ -1,3 +1,9 @@
+/**
+ * Linear service for managing Linear project management tasks and issues.
+ * Provides functionality for creating, updating, and managing Linear tasks and projects.
+ * @module linear.service
+ */
+
 import { z } from 'zod';
 import { LinearClient, Issue, Project, IssueConnection, WorkflowState } from '@linear/sdk';
 import { LangfuseSpanClient } from '../../types/langfuse';
@@ -22,7 +28,11 @@ if (process.env.LINEAR_API_KEY) {
   }
 }
 
-// Helper function to check if Linear is available
+/**
+ * Helper function to ensure Linear client is initialized and available
+ * @throws {Error} If Linear client is not configured
+ * @returns {LinearClient} Initialized Linear client instance
+ */
 const ensureLinearClient = (): LinearClient => {
   if (!linearClient) {
     throw new Error('Linear not configured. Please set LINEAR_API_KEY in your environment variables.');
@@ -30,6 +40,10 @@ const ensureLinearClient = (): LinearClient => {
   return linearClient;
 };
 
+/**
+ * Schema for creating a new Linear issue
+ * @typedef {Object} IssueSchema
+ */
 const issueSchema = z.object({
   teamId: z.string().optional().default(DEFAULT_TEAM_ID),
   title: z.string(),
@@ -44,6 +58,10 @@ const issueSchema = z.object({
   dueDate: z.string().optional()
 });
 
+/**
+ * Schema for updating an existing Linear issue
+ * @typedef {Object} UpdateIssueSchema
+ */
 const updateIssueSchema = z.object({
   issueId: z.string(),
   title: z.string().optional(),
@@ -58,31 +76,49 @@ const updateIssueSchema = z.object({
   dueDate: z.string().optional()
 });
 
+/**
+ * Schema for searching Linear issues
+ * @typedef {Object} SearchIssuesSchema
+ */
 const searchIssuesSchema = z.object({
   projectIds: z.array(z.string()).optional(),
-  startDate: z.string(),
-  endDate: z.string()
+  startDate: z.date(),
+  endDate: z.date()
 });
 
-// Add new schemas for actions
+/**
+ * Schema for adding multiple tasks
+ * @typedef {Object} AddTasksPayloadSchema
+ */
 const addTasksPayloadSchema = z.object({
   tasks: z.array(issueSchema),
   conversation_uuid: z.string().optional()
 });
 
+/**
+ * Schema for updating multiple tasks
+ * @typedef {Object} UpdateTasksPayloadSchema
+ */
 const updateTasksPayloadSchema = z.object({
   tasks: z.array(updateIssueSchema),
   conversation_uuid: z.string().optional()
 });
 
+/**
+ * Schema for getting tasks with date range
+ * @typedef {Object} GetTasksPayloadSchema
+ */
 const getTasksPayloadSchema = z.object({
   projectIds: z.array(z.string()).optional(),
-  startDate: z.string(),
-  endDate: z.string(),
+  startDate: z.string().transform(str => new Date(str)),
+  endDate: z.string().transform(str => new Date(str)),
   conversation_uuid: z.string()
 });
 
-// Change this from type to const assertion to allow string assignment
+/**
+ * Available Linear actions
+ * @constant {readonly string[]}
+ */
 const LINEAR_ACTIONS = [
   'add_tasks',
   'update_tasks',
@@ -91,19 +127,36 @@ const LINEAR_ACTIONS = [
   'get_states'
 ] as const;
 
+/**
+ * Interface for project information
+ * @interface ProjectInfo
+ */
 interface ProjectInfo {
   name: string;
   description: string | null;
   state: string;
 }
 
+/**
+ * Interface for state information
+ * @interface StateInfo
+ */
 interface StateInfo {
   name: string;
   type: string;
   color: string;
 }
 
+/**
+ * Utility functions for formatting Linear data
+ * @namespace formatters
+ */
 const formatters = {
+  /**
+   * Converts priority number to human-readable label
+   * @param {number|null|undefined} priority - The priority number
+   * @returns {string} Formatted priority label
+   */
   getPriorityLabel: (priority: number | null | undefined): string => {
     switch (priority) {
       case 0: return "No priority";
@@ -115,6 +168,11 @@ const formatters = {
     }
   },
 
+  /**
+   * Formats a date into a localized string
+   * @param {string|Date|null|undefined} date - The date to format
+   * @returns {string} Formatted date string
+   */
   formatDate: (date: string | Date | null | undefined): string => {
     if (!date) return '';
     const dateObj = typeof date === 'string' ? new Date(date) : date;
@@ -125,11 +183,23 @@ const formatters = {
     });
   },
 
+  /**
+   * Formats project information into a string
+   * @param {ProjectInfo|null} project - The project information
+   * @returns {string} Formatted project string
+   */
   formatProjectInfo: (project: ProjectInfo | null): string => {
     if (!project) return 'Unassigned';
     return `${project.name}${project.description ? ` - ${project.description}` : ''}`;
   },
 
+  /**
+   * Formats issue details into a readable string
+   * @param {Issue} issue - The Linear issue
+   * @param {Map<string, ProjectInfo>} projectMap - Map of project information
+   * @param {Map<string, StateInfo>} stateMap - Map of state information
+   * @returns {Promise<string>} Formatted issue details
+   */
   formatIssueDetails: async (
     issue: Issue, 
     projectMap: Map<string, ProjectInfo>, 
@@ -150,6 +220,13 @@ ${issue.dueDate ? `Due Date: ${formatters.formatDate(issue.dueDate)}` : ''}
 ${issue.description ? `Description: ${issue.description}` : ''}`.trim();
   },
 
+  /**
+   * Formats a tasks report with issue count and project information
+   * @param {number} issueCount - Number of issues
+   * @param {number|undefined} projectCount - Number of projects
+   * @param {string[]} formattedIssues - Array of formatted issue strings
+   * @returns {string} Formatted tasks report
+   */
   formatTasksReport: (
     issueCount: number, 
     projectCount: number | undefined, 
@@ -162,6 +239,11 @@ ${issue.description ? `Description: ${issue.description}` : ''}`.trim();
     return [header, ...formattedIssues].join('\n───────────────────\n');
   },
 
+  /**
+   * Formats a list of projects into a readable string
+   * @param {Project[]} projects - Array of Linear projects
+   * @returns {string} Formatted projects list
+   */
   formatProjectsList: (projects: Project[]): string => {
     return projects.map(project => `
 🗂️ ${project.name}
@@ -173,6 +255,11 @@ ${project.targetDate ? `Target Date: ${formatters.formatDate(project.targetDate)
     ).join('\n───────────────────\n');
   },
 
+  /**
+   * Formats a list of workflow states into a readable string
+   * @param {WorkflowState[]} states - Array of Linear workflow states
+   * @returns {string} Formatted states list
+   */
   formatStatesList: (states: WorkflowState[]): string => {
     return states.map(state => `
 ⚡ ${state.name}
@@ -183,6 +270,11 @@ ${state.description ? `Description: ${state.description}` : ''}`
     ).join('\n───────────────\n');
   },
 
+  /**
+   * Gets context maps for projects and states
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
+   * @returns {Promise<{projectMap: Map<string, ProjectInfo>, stateMap: Map<string, StateInfo>}>} Maps of project and state information
+   */
   getContextMaps: async (span?: LangfuseSpanClient) => {
     try {
       span?.event({ name: 'linear_get_context_maps_start' });
@@ -217,9 +309,9 @@ ${state.description ? `Description: ${state.description}` : ''}`
 
       span?.event({
         name: 'linear_get_context_maps_complete',
-        output: {
-          projectsCount: projects.nodes.length,
-          statesCount: states.length
+        output: { 
+          projects: projectMap.size,
+          states: stateMap.size
         }
       });
 
@@ -236,14 +328,18 @@ ${state.description ? `Description: ${state.description}` : ''}`
 };
 
 const linearService = {
-  createIssue: async (payload: z.infer<typeof issueSchema>, span?: LangfuseSpanClient): Promise<Issue | null> => {
+  createIssue: async (
+    payload: z.infer<typeof issueSchema>, 
+    span?: LangfuseSpanClient
+  ): Promise<Issue | null> => {
     try {
       span?.event({
         name: 'linear_create_issue_start',
         input: { payload }
       });
 
-      const result = await linearClient.createIssue(issueSchema.parse(payload));
+      const client = ensureLinearClient();
+      const result = await client.createIssue(issueSchema.parse(payload));
       
       if (!result.success || !result.issue) {
         span?.event({
@@ -332,7 +428,8 @@ const linearService = {
         input: { issueId, updateData }
       });
 
-      const result = await linearClient.updateIssue(issueId, updateData);
+      const client = ensureLinearClient();
+      const result = await client.updateIssue(issueId, updateData);
       
       if (!result.success || !result.issue) {
         span?.event({
@@ -373,6 +470,8 @@ const linearService = {
       let hasNextPage = true;
       let endCursor: string | undefined;
 
+      const client = ensureLinearClient();
+
       while (hasNextPage) {
         const filter: IssueFilter = {
           or: [
@@ -387,7 +486,7 @@ const linearService = {
           filter.project = { id: { in: projectIds } };
         }
 
-        const issues: IssueConnection = await linearClient.issues({
+        const issues: IssueConnection = await client.issues({
           first: 100,
           after: endCursor,
           filter
@@ -413,7 +512,8 @@ const linearService = {
   fetchProjects: async (span?: LangfuseSpanClient) => {
     try {
       span?.event({ name: 'linear_fetch_projects_start' });
-      const projects = await linearClient.projects();
+      const client = ensureLinearClient();
+      const projects = await client.projects();
       
       span?.event({
         name: 'linear_fetch_projects_complete',
@@ -438,7 +538,8 @@ const linearService = {
         input: { projectId }
       });
 
-      const project = await linearClient.project(projectId);
+      const client = ensureLinearClient();
+      const project = await client.project(projectId);
       
       span?.event({
         name: 'linear_fetch_project_details_complete',
@@ -465,7 +566,8 @@ const linearService = {
         input: { teamId }
       });
 
-      const team = await linearClient.team(teamId);
+      const client = ensureLinearClient();
+      const team = await client.team(teamId);
       if (!team) {
         throw new Error(`Team not found: ${teamId}`);
       }
@@ -483,56 +585,6 @@ const linearService = {
       span?.event({
         name: 'linear_fetch_team_states_error',
         input: { teamId },
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
-      throw error;
-    }
-  },
-
-  getContextMaps: async (span?: LangfuseSpanClient) => {
-    try {
-      span?.event({ name: 'linear_get_context_maps_start' });
-
-      const [projects, states] = await Promise.all([
-        linearClient.projects(),
-        linearService.fetchTeamStates(DEFAULT_TEAM_ID, span)
-      ]);
-
-      const projectMap = new Map<string, ProjectInfo>(
-        projects.nodes.map(project => [
-          project.id,
-          {
-            name: project.name,
-            description: project.description,
-            state: project.state
-          }
-        ])
-      );
-
-      const stateMap = new Map<string, StateInfo>(
-        states.map(state => [
-          state.id,
-          {
-            name: state.name,
-            type: state.type,
-            color: state.color
-          }
-        ])
-      );
-
-      span?.event({
-        name: 'linear_get_context_maps_complete',
-        output: {
-          projectsCount: projects.nodes.length,
-          statesCount: states.length
-        }
-      });
-
-      return { projectMap, stateMap };
-    } catch (error) {
-      span?.event({
-        name: 'linear_get_context_maps_error',
         output: { error: error instanceof Error ? error.message : 'Unknown error' },
         level: 'ERROR'
       });

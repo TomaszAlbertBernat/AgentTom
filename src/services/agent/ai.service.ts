@@ -44,7 +44,10 @@ export const aiService = {
       messages: fastTrackMessages,
       model: stateManager.getState().config.model,
       temperature: 0,
-      user: stateManager.getState().profile
+      user: {
+        uuid: stateManager.getState().config.user_uuid || '',
+        name: stateManager.getState().profile.user_name
+      }
     });
 
     fastTrackGeneration.end({output: fastTrack});
@@ -119,13 +122,19 @@ export const aiService = {
         messages: environmentMessages,
         model: state.config.alt_model ?? state.config.model,
         temperature: 0,
-        user: state.profile
+        user: {
+          uuid: state.config.user_uuid || '',
+          name: state.profile.user_name
+        }
       }),
       completion.object<AgentThoughts['context']>({
         messages: generalContextMessages,
         model: state.config.alt_model ?? state.config.model,
         temperature: 0,
-        user: state.profile
+        user: {
+          uuid: state.config.user_uuid || '',
+          name: state.profile.user_name
+        }
       })
     ]);
 
@@ -170,13 +179,19 @@ export const aiService = {
         messages: toolsMessages,
         model: state.config.alt_model ?? state.config.model,
         temperature: 0,
-        user: state.profile
+        user: {
+          uuid: state.config.user_uuid || '',
+          name: state.profile.user_name
+        }
       }),
       completion.object<AgentThoughts['memory']>({
         messages: memoryMessages,
         model: state.config.alt_model ?? state.config.model,
         temperature: 0,
-        user: state.profile
+        user: {
+          uuid: state.config.user_uuid || '',
+          name: state.profile.user_name
+        }
       })
     ]);
 
@@ -210,7 +225,10 @@ export const aiService = {
       messages: taskMessages,
       model: 'gpt-4o',
       temperature: 0,
-      user: state.profile
+      user: {
+        uuid: state.config.user_uuid || '',
+        name: state.profile.user_name
+      }
     });
 
     const persisted_tasks = await taskService.createTasks(state.config.conversation_uuid!, taskPlanning?.result ?? []);
@@ -250,7 +268,10 @@ export const aiService = {
       messages: actionMessages,
       model: state.config.model,
       temperature: 0,
-      user: state.profile
+      user: {
+        uuid: state.config.user_uuid || '',
+        name: state.profile.user_name
+      }
     });
 
     if (!actionPlanning?.result) {
@@ -352,7 +373,10 @@ export const aiService = {
       messages: useMessages,
       model: state.config.model,
       temperature: 0,
-      user: state.profile
+      user: {
+        uuid: state.config.user_uuid || '',
+        name: state.profile.user_name
+      }
     });
 
     if (!toolUse?.result) {
@@ -393,8 +417,7 @@ export const aiService = {
     const tool = toolsMap[current_tool?.name ?? 'unknown'];
     if (!tool) {
       await span.end({
-        error: `Tool ${current_tool?.name} not found`,
-        status: 'error'
+        output: `Tool ${current_tool?.name} not found`
       });
       throw new Error(`Tool ${current_tool?.name} not found`);
     }

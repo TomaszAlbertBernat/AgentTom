@@ -7,6 +7,7 @@ import type {Action, AgentThoughts} from '../../types/agent';
 import {actions} from '../../schema/action';
 import {actionDocuments} from '../../schema/actionDocuments';
 import {documents} from '../../schema/document';
+import type { DocumentMetadata } from '../../types/document';
 
 const taskSchema = z.object({
   name: z.string(),
@@ -94,7 +95,10 @@ const findByConversationId = async (conversation_uuid: string) => {
 
     if (record.actions) {
       const task = tasks_map.get(task_uuid);
-      const action = mapActionRecordToAction(record.actions);
+      const action = mapActionRecordToAction({
+        ...record.actions,
+        result: record.actions.result as string | null
+      });
 
       // Add documents to action if they exist
       if (record.documents) {
@@ -102,12 +106,16 @@ const findByConversationId = async (conversation_uuid: string) => {
         action.documents.push({
           uuid: record.documents.uuid,
           text: record.documents.text,
-          metadata: record.documents.metadata
+          metadata: record.documents.metadata as DocumentMetadata,
+          source_uuid: record.documents.source_uuid ?? '',
+          conversation_uuid: record.documents.conversation_uuid ?? '',
+          created_at: record.documents.created_at ?? new Date().toISOString(),
+          updated_at: record.documents.updated_at ?? new Date().toISOString()
         });
       }
 
       // Only add action if it's not already in the array
-      if (!task.actions.some(a => a.uuid === action.uuid)) {
+      if (!task.actions.some((a: Action) => a.uuid === action.uuid)) {
         task.actions.push(action);
       }
     }

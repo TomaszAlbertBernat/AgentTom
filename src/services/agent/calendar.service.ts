@@ -126,7 +126,7 @@ const createAuthClient = async ({client_id, client_secret, redirect_uri}: Calend
         const new_tokens: CalendarTokens = {
           access_token: response.token,
           refresh_token: tokens.refresh_token, // Keep existing refresh token
-          expiry_date: auth.credentials.expiry_date
+          expiry_date: auth.credentials.expiry_date ?? undefined
         };
         await saveTokens(new_tokens);
         auth.setCredentials(new_tokens);
@@ -153,7 +153,15 @@ const handleCallback = async (auth: OAuth2Client, code: string, span?: LangfuseS
   try {
     const {tokens} = await auth.getToken(code);
     auth.setCredentials(tokens);
-    await saveTokens(tokens);
+    
+    // Convert tokens to CalendarTokens format
+    const calendarTokens: CalendarTokens = {
+      access_token: tokens.access_token || '',
+      refresh_token: tokens.refresh_token || undefined,
+      expiry_date: tokens.expiry_date ?? undefined
+    };
+    
+    await saveTokens(calendarTokens);
     
     span?.event({
       name: 'calendar_auth_success',
@@ -161,7 +169,7 @@ const handleCallback = async (auth: OAuth2Client, code: string, span?: LangfuseS
       output: {has_refresh_token: !!tokens.refresh_token}
     });
     
-    return tokens;
+    return calendarTokens;
   } catch (error) {
     span?.event({
       name: 'calendar_auth_error',
@@ -470,12 +478,7 @@ const calendarService = {
       return documentService.createErrorDocument({
         error,
         conversation_uuid,
-        context: 'Failed to execute calendar operation',
-        metadata: {
-          action,
-          payload_type: typeof payload,
-          error_details: (error as CalendarError).details
-        }
+        context: `Failed to execute calendar operation: ${action}`
       });
     }
   },

@@ -127,7 +127,10 @@ export const memoryService = {
   async searchMemories(query: string, filters?: SearchFilters, limit = 5): Promise<MemoryWithDocument[]> {
     try {
       const search_results = await searchService.search(
-        query,
+        {
+          vector_query: query,
+          text_query: query
+        },
         { 
           ...filters, 
           content_type: 'memory' as const 

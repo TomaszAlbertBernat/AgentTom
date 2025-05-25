@@ -80,6 +80,9 @@ export const normalizeMessage = async (message: ExternalMessage): Promise<CoreMe
       }
 
       if (part.type === 'image') {
+        if (!part.source) {
+          throw new Error('Image source is required for image type parts');
+        }
         return {
           type: 'image',
           image: part.source.data,
