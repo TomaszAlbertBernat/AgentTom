@@ -2,13 +2,16 @@ import db from '../../database/db';
 import {users} from '../../schema/user';
 import {eq} from 'drizzle-orm';
 import type {User} from '../../schema/user';
+import { logger } from './logger.service';
+
+const userLogger = logger.child('USER_SERVICE');
 
 // Export individual functions instead of a class for better modularity and testing
 export const findByToken = async (token: string): Promise<User | undefined> => {
-  console.log('Finding user by token:', token); // Debug log
+  userLogger.debug('Finding user by token', { hasToken: !!token });
   
   if (!token) {
-    console.log('No token provided'); // Debug log
+    userLogger.debug('No token provided');
     return undefined;
   }
 
@@ -19,10 +22,14 @@ export const findByToken = async (token: string): Promise<User | undefined> => {
       .where(eq(users.token, token))
       .limit(1);
 
-    console.log('Database query result:', user); // Debug log
+    userLogger.debug('Database query result', { 
+      userFound: !!user, 
+      userId: user?.uuid,
+      userName: user?.name 
+    });
     return user;
   } catch (error) {
-    console.error('Error finding user by token:', error); // Error log
+    userLogger.error('Error finding user by token', error as Error, { token });
     throw error;
   }
 };

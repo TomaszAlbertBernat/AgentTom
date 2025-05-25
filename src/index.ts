@@ -3,18 +3,19 @@ import { app } from './app';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { sqlite } from './database';
 import { env, logServiceStatus } from './config/env.config';
+import { logger } from './services/common/logger.service';
 
 // Run migrations
 try {
-  console.log('Running database migrations...');
+  logger.migration('Running database migrations...');
   migrate(sqlite, { migrationsFolder: './src/database/migrations' });
-  console.log('Migrations completed successfully');
+  logger.migration('Migrations completed successfully');
 } catch (error) {
-  console.log('Migration error (this is normal if tables already exist):');
+  logger.warn('Migration error (this is normal if tables already exist)');
   if (error instanceof Error) {
-    console.log(error.message);
+    logger.debug('Migration error details', { message: error.message });
   } else {
-    console.log(String(error));
+    logger.debug('Migration error details', { error: String(error) });
   }
 }
 
@@ -23,9 +24,9 @@ logServiceStatus();
 
 // Start server
 const port = env.PORT;
-console.log(`🚀 Server is running on port ${port}`);
-console.log(`🌐 App URL: ${env.APP_URL}`);
-console.log(`🔧 Environment: ${env.NODE_ENV}`);
+logger.startup(`Server is running on port ${port}`);
+logger.startup(`App URL: ${env.APP_URL}`);
+logger.startup(`Environment: ${env.NODE_ENV}`);
 
 serve({
   fetch: app.fetch,

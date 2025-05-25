@@ -40,14 +40,14 @@ interface NonSilentInterval {
 
 const probeFile = (file_path: string): Promise<ffmpeg.FfprobeData> => 
   new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(file_path, (err, metadata) => {
+    ffmpeg.ffprobe(file_path, (err: any, metadata: ffmpeg.FfprobeData) => {
       if (err) reject(err);
       else resolve(metadata);
     });
   });
 
 const extractMetadata = (data: ffmpeg.FfprobeData): AudioMetadata => {
-  const stream = data.streams.find(s => s.codec_type === 'audio');
+  const stream = data.streams.find((s: any) => s.codec_type === 'audio');
   if (!stream) throw new Error('No audio stream found');
 
   const format = data.format;
@@ -81,7 +81,7 @@ export const analyzeLoudness = (file_path: string, interval = 0.1): Promise<Audi
       .format('null')
       .output('/dev/null')
       .on('error', reject)
-      .on('stderr', stderr_line => {
+      .on('stderr', (stderr_line: string) => {
         const rms_match = stderr_line.match(/lavfi\.astats\.Overall\.RMS_level=(-?\d+(\.\d+)?)/);
         const time_match = stderr_line.match(/pts_time:(\d+(\.\d+)?)/);
         if (rms_match && time_match) {
@@ -108,7 +108,7 @@ export const detectSilence = (file_path: string, threshold = -50, min_duration =
       .format('null')
       .output('/dev/null')
       .on('error', reject)
-      .on('stderr', stderr_line => {
+      .on('stderr', (stderr_line: string) => {
         const silence_start_match = stderr_line.match(/silence_start: ([\d\.]+)/);
         const silence_end_match = stderr_line.match(/silence_end: ([\d\.]+) \| silence_duration: ([\d\.]+)/);
 
@@ -141,7 +141,7 @@ export const detectNonSilence = async (
       .format('null')
       .output('/dev/null')
       .on('error', reject)
-      .on('stderr', stderr_line => {
+      .on('stderr', (stderr_line: string) => {
         const silence_start_match = stderr_line.match(/silence_start: ([\d\.]+)/);
         const silence_end_match = stderr_line.match(/silence_end: ([\d\.]+) \| silence_duration: ([\d\.]+)/);
         const duration_match = stderr_line.match(/Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2})/);
@@ -284,7 +284,7 @@ export const convertToOgg = async (input_path: string, output_path: string): Pro
       .audioCodec('libvorbis')
       .toFormat('ogg')
       .on('error', reject)
-      .on('end', resolve)
+      .on('end', () => resolve())
       .save(output_path);
   });
 };

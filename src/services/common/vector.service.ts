@@ -1,5 +1,8 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { z } from 'zod';
+import { logger } from './logger.service';
+
+const vectorLogger = logger.child('VECTOR_SERVICE');
 
 // Updated validation schemas
 const SearchFiltersSchema = z.object({
@@ -59,7 +62,7 @@ const formatSearchFilters = (filters: SearchFilters) => {
     must.push({ key: 'subcategory', match: { value: filters.subcategory } });
   }
 
-  console.log('Formatted Qdrant filters:', JSON.stringify({ must }, null, 2));
+  vectorLogger.debug('Formatted Qdrant filters', { filters: { must } });
   return must.length > 0 ? { must } : undefined;
 };
 
@@ -147,7 +150,7 @@ export const vectorService = {
     limit = 10
   ): Promise<VectorSearchResult[]> {
     try {
-      console.log('Vector service received filters:', filters);
+      vectorLogger.debug('Vector service received filters', { filters });
       const filter = filters ? formatSearchFilters(filters) : undefined;
 
       const results = await qdrant.search(COLLECTION_NAME, {
@@ -159,7 +162,10 @@ export const vectorService = {
 
       // Debug log the first result's full payload structure
       if (results.length > 0) {
-        console.log('First result payload structure:', JSON.stringify(results[0].payload, null, 2));
+        vectorLogger.trace('First result payload structure', { 
+          payload: results[0].payload,
+          resultCount: results.length 
+        });
       }
 
       const average_score = results.reduce((acc, r) => acc + r.score, 0) / results.length;

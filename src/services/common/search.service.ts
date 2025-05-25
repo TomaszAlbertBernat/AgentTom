@@ -5,7 +5,24 @@ import { vectorService } from './vector.service';
 import { algoliaService } from './algolia.service';
 import { embedding } from './llm.service';
 import type { Memory } from '../../schema/memory';
+import { logger } from './logger.service';
 
+const searchLogger = logger.child('SEARCH_SERVICE');
+
+/**
+ * Represents a vector search result from the vector database
+ */
+interface VectorSearchResult {
+  payload: {
+    document_uuid: string;
+    [key: string]: any;
+  };
+  score: number;
+}
+
+/**
+ * Validation schema for search filters
+ */
 const SearchFiltersSchema = z.object({
   source_uuid: z.string().uuid().optional(),
   source: z.string().optional(),
@@ -14,14 +31,26 @@ const SearchFiltersSchema = z.object({
   subcategory: z.string().optional()
 });
 
+/**
+ * Type definition for search filters
+ */
 type SearchFilters = z.infer<typeof SearchFiltersSchema>;
 
+/**
+ * Represents a combined search result with document, score, and optional memory
+ */
 interface SearchResult {
   document: DocumentType;
   score: number;
   memory?: Memory;
 }
 
+/**
+ * Calculates Reciprocal Rank Fusion (RRF) score for combining vector and text search results
+ * @param vectorRank - Rank from vector search (1-based)
+ * @param algoliaRank - Rank from Algolia text search (1-based)
+ * @returns Combined RRF score
+ */
 const calculateRRFScore = (vectorRank?: number, algoliaRank?: number): number => {
   const k = 60;
   const vector_score = vectorRank ? 1 / (k + vectorRank) : 0;
@@ -29,13 +58,27 @@ const calculateRRFScore = (vectorRank?: number, algoliaRank?: number): number =>
   return vector_score + algolia_score;
 };
 
+/**
+ * Search query parameters for both vector and text search
+ */
 interface SearchQueries {
   vector_query: string;
   text_query: string;
   filters?: SearchFilters;
 }
 
+/**
+ * Hybrid search service that combines vector similarity search with text-based search
+ * Uses Reciprocal Rank Fusion (RRF) to merge results from both search methods
+ */
 export const searchService = {
+  /**
+   * Performs a hybrid search combining vector similarity and text search
+   * @param queries - Search queries for both vector and text search
+   * @param filters - Optional filters to apply to search results
+   * @param limit - Maximum number of results to return (default: 15)
+   * @returns Array of search results sorted by relevance score
+   */
   async search(
     queries: SearchQueries,
     filters?: SearchFilters,
@@ -65,16 +108,17 @@ export const searchService = {
       ]);
 
       // Log the results for debugging
-      console.log('Search results before filtering:', {
+      searchLogger.debug('Search results before filtering', {
         vector_count: vector_results.length,
-        algolia_count: algolia_response?.results?.[0]?.hits?.length || 0
+        algolia_count: algolia_response?.results?.[0]?.hits?.length || 0,
+        query: queries.vector_query
       });
 
       // Filter results manually if needed
       const scored_documents = new Map<string, { score: number; document_uuid: string }>();
 
       // Process vector results
-      vector_results.forEach((result, index) => {
+      vector_results.forEach((result: VectorSearchResult, index: number) => {
         if (matchesFilters(result.payload, search_filters)) {
           scored_documents.set(result.payload.document_uuid, {
             score: result.score,
@@ -142,6 +186,11 @@ export const searchService = {
   }
 };
 
+/**
+ * Builds Algolia filter string from search filters object
+ * @param filters - Search filters to convert to Algolia format
+ * @returns Algolia-compatible filter string
+ */
 function buildAlgoliaFilters(filters: SearchFilters): string {
   const conditions: string[] = [];
   
@@ -164,7 +213,12 @@ function buildAlgoliaFilters(filters: SearchFilters): string {
   return conditions.join(' AND ');
 }
 
-// Helper function to check if a document matches the filters
+/**
+ * Checks if a document matches the specified filters
+ * @param doc - Document to check against filters
+ * @param filters - Filters to apply
+ * @returns True if document matches all filters, false otherwise
+ */
 function matchesFilters(doc: any, filters: SearchFilters): boolean {
   for (const [key, value] of Object.entries(filters)) {
     if (!value) continue; // Skip undefined/null filters

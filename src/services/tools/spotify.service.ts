@@ -2,7 +2,7 @@ import {SpotifyApi, AccessToken} from '@spotify/web-api-ts-sdk';
 import {LangfuseSpanClient} from 'langfuse';
 import {z} from 'zod';
 import {stateManager} from '../agent/state.service';
-import {TokenResponse, SimplifiedSearchResults} from '../../types/tools/spotify';
+import {TokenResponse, SimplifiedSearchResults, SimplifiedTrack, SimplifiedPlaylist, SimplifiedAlbum} from '../../types/tools/spotify';
 import {prompt as spotifyPlayPrompt} from '../../prompts/tools/spotify.play';
 import {completion} from '../common/llm.service';
 import {CoreMessage} from 'ai';
@@ -151,7 +151,9 @@ const spotifyService = {
       }
 
       const spotify_client = await spotifyService.createClient(state.config.user_uuid);
-      const res = await spotify_client.search(query, types, undefined, limit);
+      // Constrain limit to Spotify API allowed values
+      const constrainedLimit = Math.min(50, Math.max(1, limit)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 43 | 44 | 45 | 46 | 47 | 48 | 49 | 50;
+      const res = await spotify_client.search(query, types, undefined, constrainedLimit);
       
       const mapArtists = (artists: any[]) => artists.map(artist => artist.name).join(', ');
 
@@ -312,7 +314,14 @@ const spotifyService = {
         }
       });
 
-      const selected_item = results[`${decision.result.split(':')[1]}s`]?.find(item => item.uri === decision.result);
+      const content_type = decision.result.split(':')[1];
+      const selected_item = content_type === 'track' 
+        ? results.tracks.find((item: SimplifiedTrack) => item.uri === decision.result)
+        : content_type === 'playlist'
+        ? results.playlists.find((item: SimplifiedPlaylist) => item.uri === decision.result) 
+        : content_type === 'album'
+        ? results.albums.find((item: SimplifiedAlbum) => item.uri === decision.result)
+        : undefined;
 
       await selection_generation?.end({
         output: {

@@ -4,6 +4,7 @@ import { z } from 'zod';
 const envSchema = z.object({
   // Basic app configuration
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  LOG_LEVEL: z.enum(['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']).default('INFO'),
   PORT: z.string().transform(Number).pipe(z.number().min(1).max(65535)).default('3000'),
   APP_URL: z.string().url(),
   API_KEY: z.string().min(1),
