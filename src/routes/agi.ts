@@ -4,8 +4,8 @@ import { zValidator } from '@hono/zod-validator';
 import { OpenAI } from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../database';
-import { conversations } from '../schema/conversations';
-import { messages } from '../schema/messages';
+import { conversations } from '../schema/conversation';
+import { messages } from '../schema/message';
 import { eq } from 'drizzle-orm';
 
 // Import JWT middleware
@@ -84,11 +84,13 @@ agi.post('/messages', zValidator('json', messageSchema), async (c) => {
     orderBy: (messages, { asc }) => [asc(messages.created_at)],
   });
 
-  // Prepare messages for OpenAI
-  const openai_messages = history.map(msg => ({
-    role: msg.role,
-    content: msg.content,
-  }));
+  // Prepare messages for OpenAI (filter out tool messages and ensure content exists)
+  const openai_messages = history
+    .filter(msg => msg.role !== 'tool' && msg.content) // Filter out tool messages and null content
+    .map(msg => ({
+      role: msg.role as 'user' | 'assistant' | 'system',
+      content: msg.content!,
+    }));
 
   // Get AI response
   const completion = await openai.chat.completions.create({
@@ -98,7 +100,7 @@ agi.post('/messages', zValidator('json', messageSchema), async (c) => {
     max_tokens: 2000,
   });
 
-  const ai_response = completion.choices[0].message.content;
+  const ai_response = completion.choices[0].message.content || 'Sorry, I could not generate a response.';
 
   // Store AI response
   const ai_message_id = uuidv4();
@@ -112,8 +114,8 @@ agi.post('/messages', zValidator('json', messageSchema), async (c) => {
 
   // Update conversation timestamp
   await db.update(conversations)
-    .set({ updated_at: new Date() })
-    .where(eq(conversations.id, current_conversation_id));
+    .set({ updated_at: new Date().toISOString() })
+    .where(eq(conversations.uuid, current_conversation_id));
 
   return c.json({
     conversation_id: current_conversation_id,
@@ -129,7 +131,7 @@ agi.get('/conversations/:id/messages', async (c) => {
   // Verify conversation belongs to user
   const conversation = await db.query.conversations.findFirst({
     where: (conversations, { eq, and }) => and(
-      eq(conversations.id, conversation_id),
+      eq(conversations.uuid, conversation_id),
       eq(conversations.user_id, user_id)
     ),
   });
