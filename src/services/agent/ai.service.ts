@@ -1,3 +1,10 @@
+/**
+ * AI service for agent reasoning, planning, and tool execution
+ * Implements the core AI agent loop with observation, planning, action, and reflection phases
+ * Manages agent thoughts, tool selection, and execution coordination
+ * @module ai.service
+ */
+
 import {completion} from '../common/llm.service';
 import {stateManager} from './state.service';
 import {prompt as environmentPrompt} from '../../prompts/agent/environment';
@@ -21,8 +28,28 @@ import { calendarService } from './calendar.service';
 import { toolsMap } from '../../config/tools.config';
 import { memoryService } from './memory.service';
 
+/**
+ * AI service for agent reasoning and execution
+ * Provides the core intelligence layer for the agent system
+ * @namespace aiService
+ */
 export const aiService = {
 
+  /**
+   * Determines if a query can be answered quickly without complex reasoning
+   * Uses fast-track analysis to bypass full reasoning loop for simple queries
+   * @param span - Langfuse trace client for tracking the fast-track decision
+   * @returns Promise that resolves to true if fast-track should be used, false otherwise
+   * @example
+   * ```typescript
+   * const shouldFastTrack = await aiService.fastTrack(span);
+   * if (shouldFastTrack) {
+   *   // Handle simple query directly
+   * } else {
+   *   // Use full reasoning loop
+   * }
+   * ```
+   */
   fastTrack: async (span: LangfuseTraceClient): Promise<boolean> => {
     const messages = stateManager.getState().interaction.messages;
     const last_three_user_messages = messages
@@ -57,6 +84,16 @@ export const aiService = {
     return fastTrack?.result || false;
   },
 
+  /**
+   * Main reasoning loop that orchestrates agent thinking process
+   * Combines observation, planning, action, and reflection in iterative cycles
+   * Continues until the agent determines it has completed the task
+   * @example
+   * ```typescript
+   * await aiService.think();
+   * // Agent has completed its reasoning and action sequence
+   * ```
+   */
   think: async () => {
     const observingSpan = observer.startSpan('observing', {
       phase: 'observation_and_drafting'
@@ -91,6 +128,17 @@ export const aiService = {
     }
   },
 
+  /**
+   * Observes the current environment and context to understand the situation
+   * Analyzes the user's message and current state to form environmental awareness
+   * @param span - Langfuse span client for tracing the observation phase
+   * @returns Promise that resolves to the updated agent state
+   * @example
+   * ```typescript
+   * const state = await aiService.observe(span);
+   * console.log(`Environment: ${state.thoughts.environment}`);
+   * ```
+   */
   observe: async (span: LangfuseSpanClient) => {
     const state = stateManager.getState();
     const user_message = state.interaction.messages.at(-1)?.content ?? 'Hello';
@@ -148,6 +196,18 @@ export const aiService = {
     return stateManager.getState();
   },
 
+  /**
+   * Drafts initial thoughts about tools and memory relevant to the current task
+   * Analyzes available tools and retrieves relevant memories for context
+   * @param span - Langfuse span client for tracing the drafting phase
+   * @returns Promise that resolves when drafting is complete
+   * @example
+   * ```typescript
+   * await aiService.draft(span);
+   * const state = stateManager.getState();
+   * console.log(`Available tools: ${state.thoughts.tools.length}`);
+   * ```
+   */
   draft: async (span: LangfuseSpanClient) => {
     const state = stateManager.getState();
     const user_message = state.interaction.messages.at(-1)?.content ?? 'Hello';
@@ -205,6 +265,17 @@ export const aiService = {
     return stateManager.getState();
   },
 
+  /**
+   * Plans tasks based on the current context and user request
+   * Breaks down the user's request into actionable tasks and persists them
+   * @param span - Langfuse span client for tracing the planning phase
+   * @returns Promise that resolves to the updated agent state
+   * @example
+   * ```typescript
+   * const state = await aiService.plan(span);
+   * console.log(`Created ${state.interaction.tasks.length} tasks`);
+   * ```
+   */
   plan: async (span: LangfuseSpanClient) => {
     const state = stateManager.getState();
 
@@ -242,6 +313,19 @@ export const aiService = {
     return stateManager.getState();
   },
 
+  /**
+   * Selects the next action to take based on current tasks and context
+   * Chooses appropriate tools and creates action records for execution
+   * @param span - Langfuse span client for tracing the action selection phase
+   * @returns Promise that resolves to the selected action or undefined if no action needed
+   * @example
+   * ```typescript
+   * const action = await aiService.next(span);
+   * if (action) {
+   *   console.log(`Selected action: ${action.name} using tool: ${action.tool_uuid}`);
+   * }
+   * ```
+   */
   next: async (span: LangfuseSpanClient) => {
     const state = stateManager.getState();
     const user_message = state.interaction.messages.at(-1)?.content ?? 'Hello';
@@ -335,6 +419,19 @@ export const aiService = {
     return action;
   },
 
+  /**
+   * Generates tool usage parameters for the selected action
+   * Gathers relevant context and determines specific parameters for tool execution
+   * @param span - Langfuse span client for tracing the tool usage phase
+   * @returns Promise that resolves to tool use payload or null if no tool use needed
+   * @example
+   * ```typescript
+   * const payload = await aiService.use(span);
+   * if (payload) {
+   *   console.log(`Tool: ${payload.action}, Payload:`, payload.payload);
+   * }
+   * ```
+   */
   use: async (span: LangfuseSpanClient) => {
     let state = stateManager.getState();
     const user_message = state.interaction.messages.at(-1)?.content ?? 'Hello';
@@ -410,6 +507,22 @@ export const aiService = {
     return toolUse.result;
   },
 
+  /**
+   * Executes the selected tool with the generated payload
+   * Handles tool execution, result processing, and state updates
+   * @param payload - Tool use payload containing action and parameters
+   * @param span - Langfuse span client for tracing the execution phase
+   * @returns Promise that resolves to the tool execution result
+   * @throws Error if tool is not found or execution fails
+   * @example
+   * ```typescript
+   * const result = await aiService.act({
+   *   action: 'search',
+   *   payload: { query: 'AI developments' }
+   * }, span);
+   * console.log('Tool execution result:', result);
+   * ```
+   */
   act: async ({action, payload}: ToolUsePayload, span: LangfuseSpanClient) => {
     const state = stateManager.getState();
     const current_tool = state.config.current_tool;
@@ -451,6 +564,13 @@ export const aiService = {
   }
 };
 
+/**
+ * Maps database action record to Action type
+ * Converts database record format to the internal Action interface
+ * @param record - Database action record with all fields
+ * @returns Mapped Action object with proper typing
+ * @private
+ */
 const mapActionRecordToAction = (record: {
   name: string;
   type: string;

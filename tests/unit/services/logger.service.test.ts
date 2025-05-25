@@ -3,12 +3,16 @@
  * Tests the core logging functionality, log levels, and component loggers
  */
 
-import { test, expect, describe, beforeEach } from 'bun:test';
-import { LogLevel, createLogger } from '../../../src/services/common/logger.service';
-import { setupTestEnvironment, createMockLogger, testHelpers } from '../../helpers/test-setup';
+// Type declarations for Bun test functions
+declare global {
+  function test(name: string, fn: () => void | Promise<void>): void;
+  function expect(value: any): any;
+  function describe(name: string, fn: () => void): void;
+  function beforeEach(fn: () => void | Promise<void>): void;
+}
 
-// Setup test environment
-setupTestEnvironment();
+import { LogLevel, createLogger } from '../../../src/services/common/logger.service';
+import { createMockLogger, testHelpers } from '../../helpers/test-setup';
 
 describe('Logger Service', () => {
   describe('LogLevel enum', () => {
@@ -189,7 +193,7 @@ describe('Logger Service', () => {
 
   describe('Component Logger', () => {
     let mockLogger: ReturnType<typeof createMockLogger>;
-    let componentLogger: ReturnType<typeof createMockLogger>['child'];
+    let componentLogger: ReturnType<ReturnType<typeof createMockLogger>['child']>;
 
     beforeEach(() => {
       mockLogger = createMockLogger();

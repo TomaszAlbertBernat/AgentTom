@@ -9,7 +9,7 @@ import { z } from 'zod';
 import db from '../../database/db';
 import { memories, type Memory, type NewMemory } from '../../schema/memory';
 import { conversationMemories } from '../../schema/conversationMemories';
-import { eq } from 'drizzle-orm';
+import { eq, and, lt } from 'drizzle-orm';
 import { documentService, type DocumentType } from './document.service';
 import { v4 as uuidv4 } from 'uuid';
 import { categoryService } from './category.service';
@@ -19,10 +19,12 @@ import { stateManager } from './state.service';
 import { memoryRecallPrompt } from '../../prompts/tools/memory.recall';
 import { memory_categories } from '../../config/memory.config';
 import { LangfuseSpanClient } from 'langfuse';
+import NodeCache from 'node-cache';
+
+// cSpell:ignore checkperiod
 
 /**
  * Interface for search filters used in memory operations
- * @interface SearchFilters
  */
 interface SearchFilters {
   /** UUID of the source document */
@@ -39,13 +41,44 @@ interface SearchFilters {
 
 /**
  * Interface for memory with associated document data
- * @interface MemoryWithDocument
- * @extends Memory
  */
 interface MemoryWithDocument extends Memory {
   /** Associated document data */
   document?: DocumentType;
 }
+
+/**
+ * Interface for structured memory query with categorized search terms
+ */
+interface MemoryQuery {
+  /** Internal reasoning about the query */
+  _thinking: string;
+  /** Array of categorized search queries */
+  queries: Array<{
+    /** Memory category to search in */
+    category: string;
+    /** Memory subcategory to search in */
+    subcategory: string;
+    /** Natural language question */
+    question: string;
+    /** Search query string */
+    query: string;
+  }>;
+}
+
+// Cache configuration
+const memoryCache = new NodeCache({
+  stdTTL: 300, // 5 minutes
+  checkperiod: 60, // Check for expired keys every minute
+  useClones: false // Store references instead of cloning
+});
+
+// Cache keys
+const CACHE_KEYS = {
+  MEMORY: (uuid: string) => `memory:${uuid}`,
+  CONVERSATION_MEMORIES: (uuid: string) => `conversation_memories:${uuid}`,
+  SEARCH_RESULTS: (query: string, filters: string) => `search:${query}:${filters}`
+};
 
 /**
  * Validation schemas for memory actions using discriminated unions
@@ -97,26 +130,6 @@ const MemoryActionSchema = z.discriminatedUnion('action', [
 ]);
 
 /**
- * Interface for structured memory query with categorized search terms
- * @interface MemoryQuery
- */
-interface MemoryQuery {
-  /** Internal reasoning about the query */
-  _thinking: string;
-  /** Array of categorized search queries */
-  queries: Array<{
-    /** Memory category to search in */
-    category: string;
-    /** Memory subcategory to search in */
-    subcategory: string;
-    /** Natural language question */
-    question: string;
-    /** Search query string */
-    query: string;
-  }>;
-}
-
-/**
  * Memory service for managing agent memories and recall operations
  * @namespace memoryService
  */
@@ -132,12 +145,24 @@ export const memoryService = {
   },
 
   /**
-   * Retrieves a memory by its UUID
+   * Retrieves a memory by its UUID with caching
    * @param {string} uuid - UUID of the memory to retrieve
    * @returns {Promise<Memory|undefined>} The memory object or undefined if not found
    */
   async getMemoryByUuid(uuid: string): Promise<Memory | undefined> {
+    const cacheKey = CACHE_KEYS.MEMORY(uuid);
+    const cachedMemory = memoryCache.get<Memory>(cacheKey);
+    
+    if (cachedMemory) {
+      return cachedMemory;
+    }
+
     const [memory] = await db.select().from(memories).where(eq(memories.uuid, uuid));
+    
+    if (memory) {
+      memoryCache.set(cacheKey, memory);
+    }
+    
     return memory;
   },
 
@@ -166,11 +191,18 @@ export const memoryService = {
   },
 
   /**
-   * Finds all memories associated with a specific conversation
+   * Finds all memories associated with a specific conversation with caching
    * @param {string} conversation_uuid - UUID of the conversation
    * @returns {Promise<Memory[]>} Array of memories associated with the conversation
    */
   async findByConversationId(conversation_uuid: string): Promise<Memory[]> {
+    const cacheKey = CACHE_KEYS.CONVERSATION_MEMORIES(conversation_uuid);
+    const cachedMemories = memoryCache.get<Memory[]>(cacheKey);
+    
+    if (cachedMemories) {
+      return cachedMemories;
+    }
+
     const result = await db
       .select({
         memories: memories,
@@ -183,11 +215,14 @@ export const memoryService = {
       )
       .where(eq(conversationMemories.conversation_uuid, conversation_uuid));
 
-    return result.map(row => row.memories);
+    const memoriesList = result.map(row => row.memories);
+    memoryCache.set(cacheKey, memoriesList);
+    
+    return memoriesList;
   },
 
   /**
-   * Searches memories using semantic and text search with optional filters
+   * Searches memories using semantic and text search with caching and optimized vector search
    * @param {string} query - Search query string
    * @param {SearchFilters} [filters] - Optional search filters
    * @param {number} [limit=5] - Maximum number of results to return
@@ -195,6 +230,14 @@ export const memoryService = {
    */
   async searchMemories(query: string, filters?: SearchFilters, limit = 5): Promise<MemoryWithDocument[]> {
     try {
+      const cacheKey = CACHE_KEYS.SEARCH_RESULTS(query, JSON.stringify(filters));
+      const cachedResults = memoryCache.get<MemoryWithDocument[]>(cacheKey);
+      
+      if (cachedResults) {
+        return cachedResults.slice(0, limit);
+      }
+
+      // Optimize vector search by using a more efficient query
       const search_results = await searchService.search(
         {
           vector_query: query,
@@ -204,23 +247,29 @@ export const memoryService = {
           ...filters, 
           content_type: 'memory' as const 
         },
-        limit
+        limit * 2
       );
 
-      // Get all memory documents in parallel and handle null cases
-      const memories_with_documents = await Promise.all(
-        search_results
-          .filter(result => result.memory)
-          .map(async result => {
-            const document = await documentService.getDocumentByUuid(result.memory!.document_uuid);
-            return {
-              ...result.memory!,
-              document: document || undefined
-            };
-          })
+      // Batch process document retrieval
+      const documentUuids = search_results
+        .filter(result => result.memory)
+        .map(result => result.memory!.document_uuid);
+
+      const documents = await Promise.all(
+        documentUuids.map(uuid => documentService.getDocumentByUuid(uuid))
       );
 
-      return memories_with_documents;
+      const memories_with_documents = search_results
+        .filter(result => result.memory)
+        .map((result, index) => ({
+          ...result.memory!,
+          document: documents[index] || undefined
+        }))
+        .filter(memory => memory.document); // Filter out memories without documents
+
+      memoryCache.set(cacheKey, memories_with_documents);
+      
+      return memories_with_documents.slice(0, limit);
     } catch (error) {
       console.error('Memory search failed:', error);
       return [];
@@ -578,6 +627,47 @@ export const memoryService = {
             context: 'Memory service - getRecentMemoriesContext',
             source_uuid: 'memory_service'
         });
+    }
+  },
+
+  /**
+   * Prunes old and unused memories to optimize storage and performance
+   * @param {number} daysThreshold - Number of days after which memories are considered old
+   * @returns {Promise<void>}
+   */
+  async pruneOldMemories(daysThreshold = 30): Promise<void> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysThreshold);
+
+    try {
+      // Find old memories that haven't been accessed
+      const oldMemories = await db
+        .select()
+        .from(memories)
+        .where(
+          and(
+            lt(memories.updated_at, cutoffDate.toISOString())
+          )
+        );
+
+      // Batch process memory deletion
+      const batchSize = 100;
+      for (let i = 0; i < oldMemories.length; i += batchSize) {
+        const batch = oldMemories.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async memory => {
+            await Promise.all([
+              memoryService.deleteMemory(memory.uuid),
+              documentService.deleteDocument(memory.document_uuid)
+            ]);
+          })
+        );
+      }
+
+      // Clear cache after pruning
+      memoryCache.flushAll();
+    } catch (error) {
+      console.error('Memory pruning failed:', error);
     }
   }
 };

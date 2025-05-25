@@ -13,3 +13,4 @@ export * from './category';
 export * from './conversationMemories';
 export * from './taskDocuments';
 export * from './jobs';
+export * from './api-keys';

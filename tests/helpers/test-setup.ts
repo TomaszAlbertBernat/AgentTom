@@ -2,7 +2,11 @@
  * Test setup and utilities for AgentTom test suite
  */
 
-// Note: bun:test is built-in to Bun runtime and doesn't need import declarations
+// Global type declarations for Bun test functions
+declare global {
+  function beforeEach(fn: () => void | Promise<void>): void;
+  function afterEach(fn: () => void | Promise<void>): void;
+}
 
 // Mock environment variables for testing
 export const mockEnv = {
@@ -19,24 +23,6 @@ export const mockEnv = {
 
 // Store original environment variables
 const originalEnv = { ...process.env };
-
-/**
- * Sets up test environment before each test
- */
-export const setupTestEnvironment = () => {
-  beforeEach(() => {
-    // Set test environment variables
-    Object.assign(process.env, mockEnv);
-  });
-
-  afterEach(() => {
-    // Restore original environment
-    process.env = { ...originalEnv };
-    
-    // Clear any module caches if needed
-    // This ensures clean state between tests
-  });
-};
 
 /**
  * Mock logger for testing - suppresses output and captures logs

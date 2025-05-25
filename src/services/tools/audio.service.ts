@@ -1,3 +1,12 @@
+/**
+ * Audio service for processing, analyzing, and manipulating audio files
+ * Provides functionality for metadata extraction, loudness analysis, silence detection,
+ * and audio format conversions using FFmpeg
+ * @module audio.service
+ */
+
+// cSpell:ignore ffprobe Ffprobe astats aresample lavfi silencedetect Vorbis libvorbis
+
 import ffmpeg from 'fluent-ffmpeg';
 import { exec } from 'child_process';
 import util from 'util';
@@ -7,37 +16,79 @@ import { z } from 'zod';
 
 const execPromise = util.promisify(exec);
 
+/**
+ * Audio metadata information extracted from audio files
+ * @interface AudioMetadata
+ */
 interface AudioMetadata {
+  /** Duration of the audio file in seconds */
   duration: number;
+  /** Sample rate in Hz */
   sampleRate: number;
+  /** Number of audio channels */
   channels: number;
+  /** Bit rate in bits per second */
   bitRate: number;
+  /** Audio codec name */
   codec: string;
+  /** Audio format name */
   format: string;
 }
 
+/**
+ * Loudness data point with time and loudness level
+ * @interface AudioLoudnessData
+ */
 interface AudioLoudnessData {
+  /** Time position in seconds */
   time: number;
+  /** Loudness level in dB */
   loudness: number;
 }
 
+/**
+ * Silent interval in audio with start, end, and duration
+ * @interface SilenceInterval
+ */
 interface SilenceInterval {
+  /** Start time of silence in seconds */
   start: number;
+  /** End time of silence in seconds */
   end: number;
+  /** Duration of silence in seconds */
   duration: number;
 }
 
+/**
+ * Audio chunk definition with start and end times
+ * @interface AudioChunk
+ */
 interface AudioChunk {
+  /** Start time of chunk in seconds */
   start: number;
+  /** End time of chunk in seconds */
   end: number;
 }
 
+/**
+ * Non-silent interval in audio with start, end, and duration
+ * @interface NonSilentInterval
+ */
 interface NonSilentInterval {
+  /** Start time of non-silent audio in seconds */
   start: number;
+  /** End time of non-silent audio in seconds */
   end: number;
+  /** Duration of non-silent audio in seconds */
   duration: number;
 }
 
+/**
+ * Probes an audio file to extract metadata using FFmpeg
+ * @param file_path - Path to the audio file
+ * @returns Promise that resolves to FFmpeg probe data
+ * @private
+ */
 const probeFile = (file_path: string): Promise<ffmpeg.FfprobeData> => 
   new Promise((resolve, reject) => {
     ffmpeg.ffprobe(file_path, (err: any, metadata: ffmpeg.FfprobeData) => {
@@ -46,6 +97,12 @@ const probeFile = (file_path: string): Promise<ffmpeg.FfprobeData> =>
     });
   });
 
+/**
+ * Extracts audio metadata from FFmpeg probe data
+ * @param data - FFmpeg probe data
+ * @returns Structured audio metadata
+ * @private
+ */
 const extractMetadata = (data: ffmpeg.FfprobeData): AudioMetadata => {
   const stream = data.streams.find((s: any) => s.codec_type === 'audio');
   if (!stream) throw new Error('No audio stream found');
@@ -61,6 +118,17 @@ const extractMetadata = (data: ffmpeg.FfprobeData): AudioMetadata => {
   };
 };
 
+/**
+ * Extracts metadata from an audio file
+ * @param file_path - Path to the audio file
+ * @returns Promise that resolves to audio metadata
+ * @throws Error if file cannot be processed or no audio stream found
+ * @example
+ * ```typescript
+ * const metadata = await getMetadata('./audio.mp3');
+ * console.log(`Duration: ${metadata.duration}s, Codec: ${metadata.codec}`);
+ * ```
+ */
 export const getMetadata = async (file_path: string): Promise<AudioMetadata> => {
   try {
     const data = await probeFile(file_path);
@@ -71,6 +139,20 @@ export const getMetadata = async (file_path: string): Promise<AudioMetadata> => 
   }
 };
 
+/**
+ * Analyzes audio loudness over time with specified interval
+ * @param file_path - Path to the audio file
+ * @param interval - Time interval for analysis in seconds (default: 0.1)
+ * @returns Promise that resolves to array of loudness data points
+ * @throws Error if analysis fails
+ * @example
+ * ```typescript
+ * const loudnessData = await analyzeLoudness('./audio.mp3', 0.5);
+ * loudnessData.forEach(point => {
+ *   console.log(`Time: ${point.time}s, Loudness: ${point.loudness}dB`);
+ * });
+ * ```
+ */
 export const analyzeLoudness = (file_path: string, interval = 0.1): Promise<AudioLoudnessData[]> => {
   const loudness_data: AudioLoudnessData[] = [];
 
@@ -96,8 +178,21 @@ export const analyzeLoudness = (file_path: string, interval = 0.1): Promise<Audi
   });
 };
 
-// I'll continue with the rest of the functions, but let me know if you want to see more specific parts or have any questions about the transformation so far.
-
+/**
+ * Detects silent intervals in audio based on threshold and minimum duration
+ * @param file_path - Path to the audio file
+ * @param threshold - Silence threshold in dB (default: -50)
+ * @param min_duration - Minimum duration of silence to detect in seconds (default: 2)
+ * @returns Promise that resolves to array of silence intervals
+ * @throws Error if detection fails
+ * @example
+ * ```typescript
+ * const silentParts = await detectSilence('./audio.mp3', -40, 1);
+ * silentParts.forEach(interval => {
+ *   console.log(`Silent from ${interval.start}s to ${interval.end}s`);
+ * });
+ * ```
+ */
 export const detectSilence = (file_path: string, threshold = -50, min_duration = 2): Promise<SilenceInterval[]> => {
   const silence_intervals: SilenceInterval[] = [];
   let current_interval: Partial<SilenceInterval> = {};
@@ -126,6 +221,21 @@ export const detectSilence = (file_path: string, threshold = -50, min_duration =
   });
 };
 
+/**
+ * Detects non-silent intervals in audio by analyzing silence gaps
+ * @param file_path - Path to the audio file
+ * @param threshold - Silence threshold in dB (default: -50)
+ * @param min_duration - Minimum duration of silence to detect in seconds (default: 2)
+ * @returns Promise that resolves to array of non-silent intervals
+ * @throws Error if detection fails or audio duration cannot be determined
+ * @example
+ * ```typescript
+ * const speechParts = await detectNonSilence('./audio.mp3', -40, 1);
+ * speechParts.forEach(interval => {
+ *   console.log(`Speech from ${interval.start}s to ${interval.end}s`);
+ * });
+ * ```
+ */
 export const detectNonSilence = async (
   file_path: string, 
   threshold = -50, 
@@ -193,6 +303,17 @@ export const detectNonSilence = async (
   });
 };
 
+/**
+ * Calculates an appropriate silence threshold based on the audio file's characteristics
+ * @param file_path - Path to the audio file
+ * @returns Promise that resolves to recommended silence threshold in dB
+ * @throws Error if file cannot be analyzed or no audio stream found
+ * @example
+ * ```typescript
+ * const threshold = await getAverageSilenceThreshold('./audio.mp3');
+ * console.log(`Recommended threshold: ${threshold}dB`);
+ * ```
+ */
 export const getAverageSilenceThreshold = async (file_path: string): Promise<number> => {
   try {
     const { stdout } = await execPromise(`ffprobe -v error -of json -show_format -show_streams "${file_path}"`);
@@ -211,6 +332,17 @@ export const getAverageSilenceThreshold = async (file_path: string): Promise<num
   }
 };
 
+/**
+ * Calculates the average duration of silence intervals in an audio file
+ * @param file_path - Path to the audio file
+ * @returns Promise that resolves to average silence duration in seconds
+ * @throws Error if analysis fails
+ * @example
+ * ```typescript
+ * const avgDuration = await getAverageSilenceDuration('./audio.mp3');
+ * console.log(`Average silence duration: ${avgDuration}s`);
+ * ```
+ */
 export const getAverageSilenceDuration = async (file_path: string): Promise<number> => {
   const average_silence_threshold = await getAverageSilenceThreshold(file_path);
   const silence_segments = await detectSilence(file_path, average_silence_threshold + 25, 1);
@@ -227,6 +359,19 @@ export const getAverageSilenceDuration = async (file_path: string): Promise<numb
   return total_silence_duration / silence_segments.length;
 };
 
+/**
+ * Extracts non-silent audio chunks based on detected silence intervals
+ * @param silence_segments - Array of detected silence intervals
+ * @param total_duration - Total duration of the audio file in seconds
+ * @returns Array of audio chunks representing non-silent segments
+ * @example
+ * ```typescript
+ * const silenceIntervals = await detectSilence('./audio.mp3');
+ * const metadata = await getMetadata('./audio.mp3');
+ * const chunks = extractNonSilentChunks(silenceIntervals, metadata.duration);
+ * console.log(`Found ${chunks.length} non-silent chunks`);
+ * ```
+ */
 export const extractNonSilentChunks = (
   silence_segments: SilenceInterval[], 
   total_duration: number
@@ -248,6 +393,19 @@ export const extractNonSilentChunks = (
   return non_silent_chunks;
 };
 
+/**
+ * Saves non-silent audio chunks as separate WAV files
+ * @param file_path - Path to the source audio file
+ * @param chunks - Array of audio chunks to save
+ * @returns Promise that resolves to array of output file paths
+ * @throws Error if file operations fail
+ * @example
+ * ```typescript
+ * const chunks = [{start: 0, end: 10}, {start: 15, end: 25}];
+ * const files = await saveNonSilentChunks('./audio.mp3', chunks);
+ * console.log(`Saved chunks to: ${files.join(', ')}`);
+ * ```
+ */
 export const saveNonSilentChunks = async (
   file_path: string, 
   chunks: AudioChunk[]
@@ -271,6 +429,18 @@ export const saveNonSilentChunks = async (
   return Promise.all(chunks.map(saveChunk));
 };
 
+/**
+ * Complete pipeline to process audio file and save non-silent chunks
+ * Combines metadata extraction, silence detection, chunk extraction, and file saving
+ * @param file_path - Path to the source audio file
+ * @returns Promise that resolves to array of saved chunk file paths
+ * @throws Error if any step in the pipeline fails
+ * @example
+ * ```typescript
+ * const chunkFiles = await processAndSaveNonSilentChunks('./audio.mp3');
+ * console.log(`Processed audio into ${chunkFiles.length} chunks`);
+ * ```
+ */
 export const processAndSaveNonSilentChunks = async (file_path: string): Promise<string[]> => {
   const metadata = await getMetadata(file_path);
   const silence_intervals = await detectSilence(file_path);
@@ -278,6 +448,18 @@ export const processAndSaveNonSilentChunks = async (file_path: string): Promise<
   return saveNonSilentChunks(file_path, non_silent_chunks);
 };
 
+/**
+ * Converts audio file to OGG format using Vorbis codec
+ * @param input_path - Path to the input audio file
+ * @param output_path - Path where the OGG file should be saved
+ * @returns Promise that resolves when conversion is complete
+ * @throws Error if conversion fails
+ * @example
+ * ```typescript
+ * await convertToOgg('./input.mp3', './output.ogg');
+ * console.log('Conversion to OGG completed');
+ * ```
+ */
 export const convertToOgg = async (input_path: string, output_path: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     ffmpeg(input_path)
@@ -289,6 +471,19 @@ export const convertToOgg = async (input_path: string, output_path: string): Pro
   });
 };
 
+/**
+ * Intelligently splits audio file into meaningful segments based on silence analysis
+ * Uses adaptive thresholds and filters out very short segments
+ * @param file_path - Path to the audio file to split
+ * @param silence_threshold_offset - Offset to add to calculated threshold in dB (default: 25)
+ * @returns Promise that resolves to array of file paths for split segments
+ * @throws Error if analysis or splitting fails
+ * @example
+ * ```typescript
+ * const segments = await split('./podcast.mp3', 20);
+ * console.log(`Split audio into ${segments.length} meaningful segments`);
+ * ```
+ */
 export const split = async (
   file_path: string, 
   silence_threshold_offset = 25

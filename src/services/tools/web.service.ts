@@ -1,3 +1,12 @@
+/**
+ * Web service for scraping and searching web content
+ * Provides functionality for content extraction from URLs, intelligent web search,
+ * and document creation from web sources using Firecrawl API
+ * @module web.service
+ */
+
+// cSpell:ignore websearch
+
 import FirecrawlApp from '@mendable/firecrawl-js';
 import {z} from 'zod';
 import {v4 as uuidv4} from 'uuid';
@@ -13,34 +22,87 @@ import {completion} from '../common/llm.service';
 import {stateManager} from '../agent/state.service';
 import {createTextService} from '../common/text.service';
 
+/**
+ * Environment schema for validating required API keys
+ * @constant
+ */
 const envSchema = z.object({
   FIRECRAWL_API_KEY: z.string()
 });
 
+/**
+ * Schema for validating search payload
+ * @constant
+ */
 const searchPayloadSchema = z.object({
   query: z.string()
 });
 
+/**
+ * Schema for validating get contents payload
+ * @constant
+ */
 const getContentsPayloadSchema = z.object({
   url: z.string()
 });
 
+/**
+ * Successful scrape response containing markdown content
+ * @interface ScrapeResponse
+ */
 interface ScrapeResponse {
+  /** Scraped content in markdown format */
   markdown: string;
 }
 
+/**
+ * Error response from scraping operation
+ * @interface ErrorResponse
+ */
 interface ErrorResponse {
+  /** Error message describing what went wrong */
   error: string;
 }
 
+/**
+ * Union type for scrape operation results
+ * @type ScrapeResult
+ */
 type ScrapeResult = ScrapeResponse | ErrorResponse;
 
+/**
+ * Web service for content scraping and intelligent search operations
+ * Integrates with Firecrawl API for reliable web content extraction
+ * @namespace webService
+ */
 const webService = {
+  /**
+   * Creates a Firecrawl client instance with API key validation
+   * @returns Configured FirecrawlApp instance
+   * @throws Error if FIRECRAWL_API_KEY environment variable is missing
+   * @example
+   * ```typescript
+   * const client = webService.createClient();
+   * ```
+   */
   createClient: () => {
     const env = envSchema.parse(process.env);
     return new FirecrawlApp({apiKey: env.FIRECRAWL_API_KEY});
   },
 
+  /**
+   * Scrapes content from a URL and creates a document
+   * @param url - The URL to scrape content from
+   * @param conversation_uuid - UUID of the current conversation
+   * @param span - Optional Langfuse span for tracing
+   * @returns Promise that resolves to a document containing the scraped content
+   * @throws Error if scraping fails or URL is inaccessible
+   * @example
+   * ```typescript
+   * const doc = await webService.getContents('https://example.com', 'conv-123');
+   * console.log(`Scraped ${doc.text.length} characters from the webpage`);
+   * ```
+   */
   getContents: async (url: string, conversation_uuid: string, span?: LangfuseSpanClient): Promise<DocumentType> => {
     try {
       const firecrawl = webService.createClient();
@@ -140,6 +202,27 @@ const webService = {
     }
   },
 
+  /**
+   * Executes web operations based on action type and payload
+   * Currently supports intelligent web search with AI-powered query generation
+   * @param action - The action to perform ('search' or 'getContents')
+   * @param payload - Action-specific payload data
+   * @param span - Optional Langfuse span for tracing
+   * @returns Promise that resolves to a document containing the operation result
+   * @throws Error if action is invalid or operation fails
+   * @example
+   * ```typescript
+   * // Perform intelligent web search
+   * const doc = await webService.execute('search', {
+   *   query: 'latest developments in AI'
+   * });
+   * 
+   * // Get contents from specific URL
+   * const doc = await webService.execute('getContents', {
+   *   url: 'https://example.com/article'
+   * });
+   * ```
+   */
   async execute(action: string, payload: unknown, span?: LangfuseSpanClient): Promise<DocumentType> {
     if (action === 'search') {
       const { query } = searchPayloadSchema.parse(payload);

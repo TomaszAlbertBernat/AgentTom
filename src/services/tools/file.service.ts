@@ -1,3 +1,10 @@
+/**
+ * File service for loading, processing, and writing files of various types
+ * Supports text files, audio files, URLs, YouTube videos, and web content
+ * Provides file type detection, content extraction, and document creation
+ * @module file.service
+ */
+
 import {z} from 'zod';
 import {LangfuseSpanClient} from 'langfuse';
 import {stateManager} from '../agent/state.service';
@@ -20,6 +27,11 @@ import { documents } from '../../schema/document';
 import {youtubeService} from './youtube.service';
 import { CoreMessage } from 'ai';
 
+/**
+ * Schema for validating file service actions and payloads
+ * Supports write, load, and upload operations with type-safe validation
+ * @constant
+ */
 const filePayloadSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('write'),
@@ -43,26 +55,59 @@ const filePayloadSchema = z.discriminatedUnion('action', [
   })
 ]);
 
+/** Text service instance for tokenization and processing */
 const text_service = await createTextService({model_name: 'gpt-4o'});
 
+/**
+ * Validates if a string is a valid HTTP/HTTPS URL
+ * @param path - The string to validate
+ * @returns True if the path is a valid URL, false otherwise
+ * @private
+ */
 const isValidUrl = (path: string): boolean => /^https?:\/\//i.test(path);
 
+/**
+ * Determines if a URL points directly to a supported file type
+ * @param url - The URL to check
+ * @returns True if the URL appears to be a direct file link, false otherwise
+ * @private
+ */
 const isDirectFileUrl = (url: string): boolean => {
   const path_without_params = url.split('?')[0].split('#')[0];
   const extension = path_without_params.split('.').pop()?.toLowerCase();
   return extension ? supportedExtensions.includes(extension) : false;
 };
 
+/**
+ * Handler interface for different file types
+ * Defines the structure for type-specific file processing
+ * @interface FileTypeHandler
+ */
 interface FileTypeHandler {
+  /** Supported file extensions for this type */
   extensions: string[];
+  /** Supported MIME types for this type */
   mimeTypes: string[];
+  /** Function to load and process files of this type */
   load: (url: string, span?: LangfuseSpanClient) => Promise<{content: string; mimeType: string; path: string}>;
 }
 
+/**
+ * File type handlers for different supported formats
+ * Each handler provides specialized processing for its file type
+ * @constant
+ */
 const fileTypeHandlers: Record<string, FileTypeHandler> = {
   text: {
     extensions: mimeTypes[FileType.TEXT].extensions.map(ext => ext.replace('.', '')),
     mimeTypes: mimeTypes[FileType.TEXT].mimes,
+    /**
+     * Loads and processes text files from URLs
+     * @param url - URL of the text file
+     * @param span - Optional Langfuse span for tracing
+     * @returns Promise with file content, MIME type, and uploaded file path
+     * @throws Error if file cannot be fetched or processed
+     */
     load: async (url: string, span?: LangfuseSpanClient) => {
       const response = await fetch(url);
       if (!response.ok) {
@@ -105,6 +150,10 @@ const fileTypeHandlers: Record<string, FileTypeHandler> = {
   image: {
     extensions: mimeTypes[FileType.IMAGE].extensions.map(ext => ext.replace('.', '')),
     mimeTypes: mimeTypes[FileType.IMAGE].mimes,
+    /**
+     * Placeholder for image file loading (not yet implemented)
+     * @throws Error indicating feature is not implemented
+     */
     load: async () => {
       throw new Error('Image file loading not implemented');
     }
@@ -112,6 +161,13 @@ const fileTypeHandlers: Record<string, FileTypeHandler> = {
   audio: {
     extensions: mimeTypes[FileType.AUDIO].extensions.map(ext => ext.replace('.', '')),
     mimeTypes: mimeTypes[FileType.AUDIO].mimes,
+    /**
+     * Loads and transcribes audio files from URLs
+     * @param url - URL of the audio file
+     * @param span - Optional Langfuse span for tracing
+     * @returns Promise with transcribed content, MIME type, and uploaded file path
+     * @throws Error if file cannot be fetched, uploaded, or transcribed
+     */
     load: async (url: string, span?: LangfuseSpanClient) => {
       span?.event({
         name: 'audio_file_fetch_start',
@@ -168,6 +224,12 @@ const fileTypeHandlers: Record<string, FileTypeHandler> = {
   }
 };
 
+/**
+ * Determines the file type from a URL based on its extension
+ * @param url - The URL to analyze
+ * @returns The file type string if recognized, null otherwise
+ * @private
+ */
 const getFileTypeFromUrl = (url: string): string | null => {
   const extension = url.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
   if (!extension) return null;
@@ -175,12 +237,40 @@ const getFileTypeFromUrl = (url: string): string | null => {
   return Object.entries(fileTypeHandlers).find(([_, handler]) => handler.extensions.includes(extension))?.[0] ?? null;
 };
 
+/**
+ * Schema for validating file write payload
+ * @constant
+ */
 const WritePayloadSchema = z.object({
   query: z.string(),
   context: z.array(z.string().uuid()).default([])
 });
 
+/**
+ * File service for comprehensive file handling and processing
+ * Provides methods for loading, writing, and processing various file types
+ * @namespace fileService
+ */
 const fileService = {
+  /**
+   * Loads content from various sources including URLs, files, and YouTube videos
+   * @param path - Path or URL to the content to load
+   * @param conversation_uuid - UUID of the current conversation
+   * @param span - Optional Langfuse span for tracing
+   * @returns Promise that resolves to a document containing the loaded content
+   * @throws Error if loading fails or unsupported content type
+   * @example
+   * ```typescript
+   * // Load a text file
+   * const doc = await fileService.load('./document.txt', 'conv-123');
+   * 
+   * // Load from URL
+   * const doc = await fileService.load('https://example.com/file.pdf', 'conv-123');
+   * 
+   * // Load YouTube video
+   * const doc = await fileService.load('https://youtube.com/watch?v=xyz', 'conv-123');
+   * ```
+   */
   load: async (path: string, conversation_uuid: string, span?: LangfuseSpanClient): Promise<DocumentType> => {
     try {
       const is_url = isValidUrl(path);
@@ -268,6 +358,20 @@ const fileService = {
     }
   },
 
+  /**
+   * Uploads file content to the system and creates a document
+   * @param file_path - Path or name for the file being uploaded
+   * @param content - Text content of the file
+   * @param conversation_uuid - UUID of the current conversation
+   * @param span - Optional Langfuse span for tracing
+   * @returns Promise that resolves to a document containing the uploaded content
+   * @throws Error if upload fails or content processing fails
+   * @example
+   * ```typescript
+   * const doc = await fileService.uploadFile('notes.txt', 'Hello world', 'conv-123');
+   * console.log(`Uploaded file: ${doc.metadata.name}`);
+   * ```
+   */
   uploadFile: async (file_path: string, content: string, conversation_uuid: string, span?: LangfuseSpanClient): Promise<DocumentType> => {
     try {
       const blob = new Blob([content], {type: 'text/plain'});
@@ -316,6 +420,25 @@ const fileService = {
     }
   },
 
+  /**
+   * Generates and writes file content based on a query and context documents
+   * Uses AI to create content that incorporates information from provided context
+   * @param query - The query or prompt for content generation
+   * @param context_uuids - Array of document UUIDs to use as context
+   * @param conversation_uuid - UUID of the current conversation
+   * @param span - Optional Langfuse span for tracing
+   * @returns Promise that resolves to a document containing the generated content
+   * @throws Error if generation fails or context documents cannot be loaded
+   * @example
+   * ```typescript
+   * const doc = await fileService.write(
+   *   'Create a summary of the research findings',
+   *   ['doc-uuid-1', 'doc-uuid-2'],
+   *   'conv-123'
+   * );
+   * console.log(`Generated file: ${doc.metadata.name}`);
+   * ```
+   */
   write: async (query: string, context_uuids: string[], conversation_uuid: string, span?: LangfuseSpanClient): Promise<DocumentType> => {
     try {
       // Load context documents
@@ -448,6 +571,34 @@ const fileService = {
     }
   },
 
+  /**
+   * Executes file operations based on action type and payload
+   * Main entry point for file service operations with validation and error handling
+   * @param action - The action to perform ('write', 'load', or 'upload')
+   * @param payload - Action-specific payload data
+   * @param span - Optional Langfuse span for tracing
+   * @returns Promise that resolves to a document containing the operation result
+   * @throws Error if action is invalid or operation fails
+   * @example
+   * ```typescript
+   * // Write a file
+   * const doc = await fileService.execute('write', {
+   *   query: 'Create a report',
+   *   context: ['doc-uuid-1']
+   * });
+   * 
+   * // Load a file
+   * const doc = await fileService.execute('load', {
+   *   path: 'https://example.com/file.txt'
+   * });
+   * 
+   * // Upload content
+   * const doc = await fileService.execute('upload', {
+   *   path: 'notes.txt',
+   *   content: 'Hello world'
+   * });
+   * ```
+   */
   execute: async (action: string, payload: unknown, span?: LangfuseSpanClient): Promise<DocumentType> => {
     try {
       const state = stateManager.getState();

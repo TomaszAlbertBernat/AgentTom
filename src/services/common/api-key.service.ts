@@ -5,9 +5,9 @@
  */
 
 import { z } from 'zod';
-import { db } from '../../database';
+import db from '../../database/db';
 import { apiKeys } from '../../schema/api-keys';
-import { eq, and, lt } from 'drizzle-orm';
+import { eq, and, lt, gt } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
 
@@ -45,13 +45,14 @@ const apiKeyService = {
     
     // Store the key in the database
     await db.insert(apiKeys).values({
+      id: uuidv4(),
       userId,
       name,
       hash,
-      expiresAt,
-      scopes: scopes || [],
+      expiresAt: expiresAt?.toISOString() || null,
+      scopes: JSON.stringify(scopes || []),
       maxRequestsPerDay: maxRequestsPerDay || 1000,
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
       lastUsedAt: null,
       requestCount: 0
     });
@@ -74,7 +75,7 @@ const apiKeyService = {
     const apiKey = await db.query.apiKeys.findFirst({
       where: and(
         eq(apiKeys.hash, hash),
-        lt(apiKeys.expiresAt, new Date())
+        apiKeys.expiresAt ? gt(apiKeys.expiresAt, new Date().toISOString()) : undefined
       )
     });
     
@@ -83,7 +84,7 @@ const apiKeyService = {
     }
     
     // Check if the key has expired
-    if (apiKey.expiresAt && new Date() > apiKey.expiresAt) {
+    if (apiKey.expiresAt && new Date() > new Date(apiKey.expiresAt)) {
       return { valid: false, userId: null, scopes: [] };
     }
     
@@ -91,16 +92,19 @@ const apiKeyService = {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    if (apiKey.lastUsedAt && apiKey.lastUsedAt > today) {
+    if (apiKey.lastUsedAt && new Date(apiKey.lastUsedAt) > today) {
       if (apiKey.requestCount >= apiKey.maxRequestsPerDay) {
         return { valid: false, userId: null, scopes: [] };
       }
     }
+
+    // Parse scopes from JSON
+    const apiKeyScopes = JSON.parse(apiKey.scopes as string) as string[];
     
     // Check if the key has the required scopes
     if (requiredScopes && requiredScopes.length > 0) {
       const hasRequiredScopes = requiredScopes.every(scope => 
-        apiKey.scopes.includes(scope)
+        apiKeyScopes.includes(scope)
       );
       
       if (!hasRequiredScopes) {
@@ -111,7 +115,7 @@ const apiKeyService = {
     // Update the key's usage
     await db.update(apiKeys)
       .set({
-        lastUsedAt: new Date(),
+        lastUsedAt: new Date().toISOString(),
         requestCount: apiKey.requestCount + 1
       })
       .where(eq(apiKeys.hash, hash));
@@ -119,7 +123,7 @@ const apiKeyService = {
     return {
       valid: true,
       userId: apiKey.userId,
-      scopes: apiKey.scopes
+      scopes: apiKeyScopes
     };
   },
 
@@ -146,7 +150,7 @@ const apiKeyService = {
     await db.update(apiKeys)
       .set({
         hash: newHash,
-        lastUsedAt: new Date(),
+        lastUsedAt: new Date().toISOString(),
         requestCount: 0
       })
       .where(eq(apiKeys.hash, hash));
@@ -167,7 +171,7 @@ const apiKeyService = {
   /**
    * Gets API key usage statistics
    * @param {string} hash - The hash of the API key
-   * @returns {Promise<{requestCount: number, lastUsedAt: Date | null}>} Usage statistics
+   * @returns {Promise<{requestCount: number, lastUsedAt: string | null}>} Usage statistics
    */
   getApiKeyStats: async (hash: string) => {
     const apiKey = await db.query.apiKeys.findFirst({
