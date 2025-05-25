@@ -1,12 +1,26 @@
+/**
+ * User management service for handling user data and authentication tokens.
+ * Provides functionality for user lookup, token management, and OAuth integration.
+ * Supports Spotify and Google token management for external service integration.
+ * @module user.service
+ */
+
 import db from '../../database/db';
 import {users} from '../../schema/user';
 import {eq} from 'drizzle-orm';
 import type {User} from '../../schema/user';
 import { logger } from './logger.service';
+import { cacheService } from './cache.service';
 
+/** Component logger for user service operations */
 const userLogger = logger.child('USER_SERVICE');
 
-// Export individual functions instead of a class for better modularity and testing
+/**
+ * Finds a user by their authentication token with caching
+ * @param {string} token - Authentication token to search for
+ * @returns {Promise<User|undefined>} User object if found, undefined otherwise
+ * @throws {Error} When database query fails
+ */
 export const findByToken = async (token: string): Promise<User | undefined> => {
   userLogger.debug('Finding user by token', { hasToken: !!token });
   
@@ -16,30 +30,77 @@ export const findByToken = async (token: string): Promise<User | undefined> => {
   }
 
   try {
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.token, token))
-      .limit(1);
+    // Use cache-aside pattern for user token lookups
+    const cacheKey = `user:token:${token}`;
+    const user = await cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        userLogger.debug('Cache miss - querying database for user token');
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.token, token))
+          .limit(1);
 
-    userLogger.debug('Database query result', { 
+        return user || null;
+      },
+      {
+        ttl: 1800, // 30 minutes - balance between performance and data freshness
+        namespace: 'auth'
+      }
+    );
+
+    userLogger.debug('User token lookup result', { 
       userFound: !!user, 
       userId: user?.uuid,
-      userName: user?.name 
+      userName: user?.name,
+      fromCache: await cacheService.exists(cacheKey, { namespace: 'auth' })
     });
-    return user;
+    
+    return user || undefined;
   } catch (error) {
     userLogger.error('Error finding user by token', error as Error, { token });
     throw error;
   }
 };
 
+/**
+ * Finds a user by their UUID with caching
+ * @param {string} uuid - User UUID to search for
+ * @returns {Promise<User|undefined>} User object if found, undefined otherwise
+ */
 export const findByUUID = async (uuid: string): Promise<User | undefined> => {
-  const [user] = await db.select().from(users).where(eq(users.uuid, uuid)).limit(1);
+  try {
+    // Use cache-aside pattern for user UUID lookups
+    const cacheKey = `user:uuid:${uuid}`;
+    const user = await cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        userLogger.debug('Cache miss - querying database for user UUID');
+        const [user] = await db.select().from(users).where(eq(users.uuid, uuid)).limit(1);
+        return user || null;
+      },
+      {
+        ttl: 3600, // 1 hour - UUIDs change less frequently than tokens
+        namespace: 'auth'
+      }
+    );
 
-  return user;
+    return user || undefined;
+  } catch (error) {
+    userLogger.error('Error finding user by UUID', error as Error, { uuid });
+    throw error;
+  }
 };
 
+/**
+ * Updates Spotify OAuth tokens for a user and invalidates cache
+ * @param {string} user_uuid - UUID of the user to update
+ * @param {string} access_token - Spotify access token
+ * @param {string} refresh_token - Spotify refresh token
+ * @param {number} expires_in - Token expiration time in seconds
+ * @returns {Promise<void>}
+ */
 export const updateSpotifyTokens = async (
   user_uuid: string, 
   access_token: string, 
@@ -57,8 +118,17 @@ export const updateSpotifyTokens = async (
       updatedAt: new Date()
     })
     .where(eq(users.uuid, user_uuid));
+
+  // Invalidate user cache entries
+  await cacheService.delete(`user:uuid:${user_uuid}`, { namespace: 'auth' });
+  userLogger.debug('Invalidated user cache after Spotify token update', { user_uuid });
 };
 
+/**
+ * Retrieves Spotify OAuth tokens for a user
+ * @param {string} user_uuid - UUID of the user
+ * @returns {Promise<{access_token?: string, refresh_token?: string, expires_at?: Date}|undefined>} Spotify tokens or undefined if user not found
+ */
 export const getSpotifyTokens = async (user_uuid: string): Promise<{ 
   access_token?: string; 
   refresh_token?: string;
@@ -83,6 +153,14 @@ export const getSpotifyTokens = async (user_uuid: string): Promise<{
   };
 };
 
+/**
+ * Updates Google OAuth tokens for a user and invalidates cache
+ * @param {string} user_uuid - UUID of the user to update
+ * @param {string} access_token - Google access token
+ * @param {string} refresh_token - Google refresh token
+ * @param {number} expires_in - Token expiration time in seconds
+ * @returns {Promise<void>}
+ */
 export const updateGoogleTokens = async (
   user_uuid: string, 
   access_token: string, 
@@ -100,8 +178,17 @@ export const updateGoogleTokens = async (
       updatedAt: new Date()
     })
     .where(eq(users.uuid, user_uuid));
+
+  // Invalidate user cache entries
+  await cacheService.delete(`user:uuid:${user_uuid}`, { namespace: 'auth' });
+  userLogger.debug('Invalidated user cache after Google token update', { user_uuid });
 };
 
+/**
+ * Retrieves Google OAuth tokens for a user
+ * @param {string} user_uuid - UUID of the user
+ * @returns {Promise<{access_token?: string, refresh_token?: string, expires_at?: Date}|undefined>} Google tokens or undefined if user not found
+ */
 export const getGoogleTokens = async (user_uuid: string): Promise<{ 
   access_token?: string; 
   refresh_token?: string;

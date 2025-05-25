@@ -1,3 +1,10 @@
+/**
+ * Memory management service for storing, retrieving, and managing agent memories.
+ * Provides functionality for creating, updating, searching, and recalling memories with semantic search.
+ * Supports categorized memory storage and intelligent memory retrieval for conversations.
+ * @module memory.service
+ */
+
 import { z } from 'zod';
 import db from '../../database/db';
 import { memories, type Memory, type NewMemory } from '../../schema/memory';
@@ -13,20 +20,37 @@ import { memoryRecallPrompt } from '../../prompts/tools/memory.recall';
 import { memory_categories } from '../../config/memory.config';
 import { LangfuseSpanClient } from 'langfuse';
 
-// Add this interface definition after the imports and before MemoryActionSchema
+/**
+ * Interface for search filters used in memory operations
+ * @interface SearchFilters
+ */
 interface SearchFilters {
+  /** UUID of the source document */
   source_uuid?: string;
+  /** Source identifier */
   source?: string;
+  /** Type of content */
   content_type?: 'chunk' | 'full' | 'memory';
+  /** Memory category */
   category?: string;
+  /** Memory subcategory */
   subcategory?: string;
 }
 
+/**
+ * Interface for memory with associated document data
+ * @interface MemoryWithDocument
+ * @extends Memory
+ */
 interface MemoryWithDocument extends Memory {
+  /** Associated document data */
   document?: DocumentType;
 }
 
-// Validation schemas
+/**
+ * Validation schemas for memory actions using discriminated unions
+ * @constant {z.ZodSchema}
+ */
 const MemoryActionSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('recall'),
@@ -72,28 +96,57 @@ const MemoryActionSchema = z.discriminatedUnion('action', [
   })
 ]);
 
+/**
+ * Interface for structured memory query with categorized search terms
+ * @interface MemoryQuery
+ */
 interface MemoryQuery {
+  /** Internal reasoning about the query */
   _thinking: string;
+  /** Array of categorized search queries */
   queries: Array<{
+    /** Memory category to search in */
     category: string;
+    /** Memory subcategory to search in */
     subcategory: string;
+    /** Natural language question */
     question: string;
+    /** Search query string */
     query: string;
   }>;
 }
 
+/**
+ * Memory service for managing agent memories and recall operations
+ * @namespace memoryService
+ */
 export const memoryService = {
-  // Core CRUD operations
+  /**
+   * Creates a new memory record in the database
+   * @param {NewMemory} data - Memory data to create
+   * @returns {Promise<Memory>} The created memory object
+   */
   async createMemory(data: NewMemory): Promise<Memory> {
     const [memory] = await db.insert(memories).values(data).returning();
     return memory;
   },
 
+  /**
+   * Retrieves a memory by its UUID
+   * @param {string} uuid - UUID of the memory to retrieve
+   * @returns {Promise<Memory|undefined>} The memory object or undefined if not found
+   */
   async getMemoryByUuid(uuid: string): Promise<Memory | undefined> {
     const [memory] = await db.select().from(memories).where(eq(memories.uuid, uuid));
     return memory;
   },
 
+  /**
+   * Updates an existing memory with new data
+   * @param {string} uuid - UUID of the memory to update
+   * @param {Partial<NewMemory>} data - Partial memory data to update
+   * @returns {Promise<Memory>} The updated memory object
+   */
   async updateMemory(uuid: string, data: Partial<NewMemory>): Promise<Memory> {
     const [memory] = await db
       .update(memories)
@@ -103,10 +156,20 @@ export const memoryService = {
     return memory;
   },
 
+  /**
+   * Deletes a memory from the database
+   * @param {string} uuid - UUID of the memory to delete
+   * @returns {Promise<void>}
+   */
   async deleteMemory(uuid: string): Promise<void> {
     await db.delete(memories).where(eq(memories.uuid, uuid));
   },
 
+  /**
+   * Finds all memories associated with a specific conversation
+   * @param {string} conversation_uuid - UUID of the conversation
+   * @returns {Promise<Memory[]>} Array of memories associated with the conversation
+   */
   async findByConversationId(conversation_uuid: string): Promise<Memory[]> {
     const result = await db
       .select({
@@ -123,7 +186,13 @@ export const memoryService = {
     return result.map(row => row.memories);
   },
 
-  // Mock search implementation (to be improved later)
+  /**
+   * Searches memories using semantic and text search with optional filters
+   * @param {string} query - Search query string
+   * @param {SearchFilters} [filters] - Optional search filters
+   * @param {number} [limit=5] - Maximum number of results to return
+   * @returns {Promise<MemoryWithDocument[]>} Array of memories with associated documents
+   */
   async searchMemories(query: string, filters?: SearchFilters, limit = 5): Promise<MemoryWithDocument[]> {
     try {
       const search_results = await searchService.search(
@@ -158,6 +227,15 @@ export const memoryService = {
     }
   },
 
+  /**
+   * Recalls relevant memories using intelligent query decomposition and semantic search
+   * @param {string} query - The recall query
+   * @param {number} limit - Maximum number of memories to recall
+   * @param {string} conversation_uuid - UUID of the conversation context
+   * @param {SearchFilters} [filters] - Optional search filters
+   * @returns {Promise<DocumentType>} Document containing recalled memories
+   * @throws {Error} When memory recall fails
+   */
   async recallMemories(query: string, limit: number, conversation_uuid: string, filters?: SearchFilters): Promise<DocumentType> {
     try {
       const queries = await this.selfQuery(query);
@@ -220,6 +298,16 @@ export const memoryService = {
     }
   },
 
+  /**
+   * Creates a new memory with associated document and category
+   * @param {string} name - Name of the memory
+   * @param {string} text - Content of the memory
+   * @param {string} category - Memory category
+   * @param {string} subcategory - Memory subcategory
+   * @param {string} conversation_uuid - UUID of the conversation context
+   * @returns {Promise<DocumentType>} Document containing the created memory
+   * @throws {Error} When category is not found
+   */
   async createNewMemory(name: string, text: string, category: string, subcategory: string, conversation_uuid: string): Promise<DocumentType> {
     const document_uuid = uuidv4();
     const memory_uuid = uuidv4();
@@ -277,6 +365,16 @@ export const memoryService = {
     });
   },
 
+  /**
+   * Updates an existing memory with new information
+   * @param {string} memory_uuid - UUID of the memory to update
+   * @param {string} [name] - New name for the memory
+   * @param {string} [category_uuid] - New category UUID
+   * @param {string} [text] - New text content
+   * @param {string} conversation_uuid - UUID of the conversation context
+   * @returns {Promise<DocumentType>} Document confirming the update
+   * @throws {Error} When memory or category is not found
+   */
   async updateExistingMemory(memory_uuid: string, name: string | undefined, category_uuid: string | undefined, text: string | undefined, conversation_uuid: string): Promise<DocumentType> {
     const memory = await memoryService.getMemoryByUuid(memory_uuid);
     if (!memory) {
@@ -327,6 +425,13 @@ export const memoryService = {
     });
   },
 
+  /**
+   * Deletes an existing memory and its associated document
+   * @param {string} memory_uuid - UUID of the memory to delete
+   * @param {string} conversation_uuid - UUID of the conversation context
+   * @returns {Promise<DocumentType>} Document confirming the deletion
+   * @throws {Error} When memory is not found
+   */
   async deleteExistingMemory(memory_uuid: string, conversation_uuid: string): Promise<DocumentType> {
     const memory = await memoryService.getMemoryByUuid(memory_uuid);
     if (!memory) {
@@ -350,6 +455,11 @@ export const memoryService = {
     });
   },
 
+  /**
+   * Generates structured queries for memory recall using LLM
+   * @param {string} query - The original query to decompose
+   * @returns {Promise<MemoryQuery>} Structured query with categorized search terms
+   */
   async selfQuery(query: string): Promise<MemoryQuery> {
     const state = stateManager.getState();
     
@@ -369,6 +479,13 @@ export const memoryService = {
     return queries;
   },
 
+  /**
+   * Executes memory actions based on action type and payload
+   * @param {string} action - The action to execute (recall, remember, update, forget)
+   * @param {unknown} payload - Action-specific payload data
+   * @returns {Promise<DocumentType>} Result document from the executed action
+   * @throws {Error} When action validation fails or execution errors occur
+   */
   async execute(action: string, payload: unknown): Promise<DocumentType> {
     const parsed = MemoryActionSchema.parse({ action, payload });
     const conversation_uuid = parsed.payload.conversation_uuid || 'default';

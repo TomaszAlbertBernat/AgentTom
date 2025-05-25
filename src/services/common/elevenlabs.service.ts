@@ -1,17 +1,37 @@
+/**
+ * ElevenLabs text-to-speech service for generating audio from text.
+ * Provides functionality for converting text to speech using ElevenLabs API.
+ * Supports voice selection, model configuration, and streaming audio generation.
+ * @module elevenlabs.service
+ */
+
 import {z} from 'zod';
 import {LangfuseSpanClient} from 'langfuse';
 import {ElevenLabsClient} from 'elevenlabs';
 
+/**
+ * Zod schema for ElevenLabs configuration validation
+ * @constant {z.ZodSchema}
+ */
 const elevenlabsConfigSchema = z.object({
+  /** ElevenLabs API key */
   api_key: z.string()
 });
 
+/**
+ * Zod schema for speech generation configuration
+ * @constant {z.ZodSchema}
+ */
 const speechConfigSchema = z.object({
+  /** Text to convert to speech */
   text: z.string(),
+  /** Voice ID to use for generation (default: Rachel voice) */
   voice: z.string().default('21m00Tcm4TlvDq8ikWAM'),
+  /** Model ID for speech generation (default: eleven_turbo_v2_5) */
   model_id: z.string().default('eleven_turbo_v2_5')
 });
 
+/** ElevenLabs client instance */
 let client: ElevenLabsClient;
 try {
   if (!process.env.ELEVENLABS_API_KEY) {
@@ -25,7 +45,20 @@ try {
   throw error;
 }
 
+/**
+ * ElevenLabs service for text-to-speech generation
+ * @namespace elevenlabsService
+ */
 const elevenlabsService = {
+  /**
+   * Converts text to speech using ElevenLabs API
+   * @param {string} text - Text to convert to speech
+   * @param {string} [voice='21m00Tcm4TlvDq8ikWAM'] - Voice ID to use for generation
+   * @param {string} [model_id='eleven_turbo_v2_5'] - Model ID for speech generation
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracking
+   * @returns {Promise<AsyncIterable<Uint8Array>>} Streaming audio data
+   * @throws {Error} When text-to-speech generation fails
+   */
   speak: async (
     text: string, 
     voice?: string, 

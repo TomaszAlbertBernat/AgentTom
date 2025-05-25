@@ -8,6 +8,8 @@ import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { HTTPException } from 'hono/http-exception';
+import { swaggerUI } from '@hono/swagger-ui';
+import { openApiConfig } from './config/openapi.config';
 
 // Import middleware
 import { authMiddleware } from './middleware/auth';
@@ -91,6 +93,15 @@ app.onError((err, c) => {
 
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok' }));
+
+// OpenAPI documentation endpoints
+app.get('/docs', swaggerUI({ 
+  url: '/docs/openapi.json'
+}));
+
+app.get('/docs/openapi.json', c => {
+  return c.json(openApiConfig);
+});
 
 // Register routes
 app.route('/api/auth', authRoutes);

@@ -1,25 +1,58 @@
+/**
+ * Text processing and tokenization service for handling text analysis and chunking.
+ * Provides functionality for token counting, text splitting, header extraction, and document processing.
+ * Supports various text models and efficient chunking algorithms for large documents.
+ * @module text.service
+ */
+
 import {createByModelName} from '@microsoft/tiktokenizer';
 import type {Document, DocumentMetadata} from '../../types/document';
 import {z} from 'zod';
 import {v4 as uuidv4} from 'uuid';
 
+/**
+ * Special tokens used for chat formatting and tokenization
+ * @constant {Map<string, number>}
+ */
 const SPECIAL_TOKENS = new Map<string, number>([
   ['<|im_start|>', 100264],
   ['<|im_end|>', 100265],
   ['<|im_sep|>', 100266]
 ]);
 
+/**
+ * Zod schema for text service configuration
+ * @constant {z.ZodSchema}
+ */
 const textServiceSchema = z.object({
   model_name: z.string().default('gpt-4o')
 });
 
+/**
+ * Interface for maintaining tokenizer state and model information
+ * @interface TokenizerState
+ */
 interface TokenizerState {
+  /** The initialized tokenizer instance */
   tokenizer: Awaited<ReturnType<typeof createByModelName>> | undefined;
+  /** Name of the model being used */
   model_name: string;
 }
 
+/**
+ * Formats text for tokenization with chat-style markers
+ * @param {string} text - The text to format
+ * @returns {string} Formatted text with chat markers
+ */
 const formatForTokenization = (text: string): string => `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant<|im_end|>`;
 
+/**
+ * Counts the number of tokens in a text string
+ * @param {TokenizerState['tokenizer']} tokenizer - The tokenizer instance
+ * @param {string} text - The text to count tokens for
+ * @returns {number} Number of tokens in the text
+ * @throws {Error} When tokenizer is not initialized
+ */
 const countTokens = (tokenizer: TokenizerState['tokenizer'], text: string): number => {
   if (!tokenizer) {
     throw new Error('Tokenizer not initialized');
@@ -27,6 +60,12 @@ const countTokens = (tokenizer: TokenizerState['tokenizer'], text: string): numb
   return tokenizer.encode(text, Array.from(SPECIAL_TOKENS.keys())).length;
 };
 
+/**
+ * Initializes or updates the tokenizer for a specific model
+ * @param {TokenizerState} state - Current tokenizer state
+ * @param {string} [model] - Optional model name to use
+ * @returns {Promise<TokenizerState>} Updated tokenizer state
+ */
 const initializeTokenizer = async (state: TokenizerState, model?: string): Promise<TokenizerState> => {
   if (!state.tokenizer || model !== state.model_name) {
     const model_name = model || state.model_name;
@@ -36,6 +75,11 @@ const initializeTokenizer = async (state: TokenizerState, model?: string): Promi
   return state;
 };
 
+/**
+ * Extracts markdown headers from text and organizes them by level
+ * @param {string} text - The text to extract headers from
+ * @returns {Record<string, string[]>} Object with header levels as keys and arrays of header text as values
+ */
 const extractHeaders = (text: string): Record<string, string[]> => {
   const headers: Record<string, string[]> = {};
   const header_regex = /(^|\n)(#{1,6})\s+(.*)/g;
@@ -52,6 +96,12 @@ const extractHeaders = (text: string): Record<string, string[]> => {
   return headers;
 };
 
+/**
+ * Updates current headers with newly extracted headers, maintaining hierarchy
+ * @param {Record<string, string[]>} current - Current header state
+ * @param {Record<string, string[]>} extracted - Newly extracted headers
+ * @returns {Record<string, string[]>} Updated header state with proper hierarchy
+ */
 const updateHeaders = (current: Record<string, string[]>, extracted: Record<string, string[]>): Record<string, string[]> => {
   const updated = {...current};
 
@@ -68,6 +118,11 @@ const updateHeaders = (current: Record<string, string[]>, extracted: Record<stri
   return updated;
 };
 
+/**
+ * Extracts URLs and images from markdown text, replacing them with placeholders
+ * @param {string} text - The text to process
+ * @returns {{content: string, urls: string[], images: string[]}} Processed content with extracted URLs and images
+ */
 const extractUrlsAndImages = (text: string) => {
   const urls: string[] = [];
   const images: string[] = [];
@@ -90,6 +145,10 @@ const extractUrlsAndImages = (text: string) => {
   return {content, urls, images};
 };
 
+/**
+ * Zod schema for validating document structure
+ * @constant {z.ZodSchema}
+ */
 const DocumentSchema = z.object({
   uuid: z.string().uuid(),
   source_uuid: z.string(),
@@ -108,7 +167,15 @@ const DocumentSchema = z.object({
   updated_at: z.string()
 });
 
-// New getChunk implementation using binary search for efficiency
+/**
+ * Efficiently extracts a text chunk using binary search to optimize token limits
+ * Uses binary search algorithm to find the maximum text that fits within token limits
+ * @param {TokenizerState['tokenizer']} tokenizer - The tokenizer instance
+ * @param {string} text - The full text to chunk
+ * @param {number} start - Starting position in the text
+ * @param {number} limit - Maximum number of tokens allowed
+ * @returns {{chunk_text: string, chunk_end: number}} Extracted chunk and end position
+ */
 const getChunk = (tokenizer: TokenizerState['tokenizer'], text: string, start: number, limit: number): {chunk_text: string; chunk_end: number} => {
   // Compute overhead once
   const overhead = countTokens(tokenizer, formatForTokenization('')) - countTokens(tokenizer, '');
@@ -157,12 +224,26 @@ const getChunk = (tokenizer: TokenizerState['tokenizer'], text: string, start: n
   return { chunk_text: finalText, chunk_end: finalEnd };
 };
 
+/**
+ * Creates a text service instance with tokenization and chunking capabilities
+ * @param {z.infer<typeof textServiceSchema>} config - Configuration for the text service
+ * @param {string} [config.model_name='gpt-4o'] - Name of the model to use for tokenization
+ * @returns {Promise<{split: Function, countTokens: Function}>} Text service with split and countTokens methods
+ */
 export const createTextService = async (config: z.infer<typeof textServiceSchema>) => {
   let state: TokenizerState = {
     tokenizer: undefined,
     model_name: textServiceSchema.parse(config).model_name
   };
 
+  /**
+   * Splits text into chunks based on token limits while preserving structure
+   * @param {string} text - The text to split into chunks
+   * @param {number} limit - Maximum number of tokens per chunk
+   * @param {Partial<DocumentMetadata>} [metadata] - Optional metadata for the documents
+   * @returns {Promise<Document[]>} Array of document chunks with metadata
+   * @throws {Error} When text is empty or required
+   */
   const split = async (text: string, limit: number, metadata?: Partial<DocumentMetadata>): Promise<Document[]> => {
     if (!text) {
       throw new Error('Text is required for splitting');
@@ -220,6 +301,11 @@ export const createTextService = async (config: z.infer<typeof textServiceSchema
   };
 };
 
+/**
+ * Creates a standalone tokenizer instance for token counting and text formatting
+ * @param {string} [model_name='gpt-4o'] - Name of the model to use for tokenization
+ * @returns {Promise<{countTokens: Function, formatForTokenization: Function}>} Tokenizer with utility methods
+ */
 export const createTokenizer = async (model_name: string = 'gpt-4o') => {
   const state: TokenizerState = {
     tokenizer: undefined,
@@ -229,7 +315,17 @@ export const createTokenizer = async (model_name: string = 'gpt-4o') => {
   const initialized_state = await initializeTokenizer(state);
 
   return {
+    /**
+     * Counts tokens in the provided text
+     * @param {string} text - Text to count tokens for
+     * @returns {number} Number of tokens
+     */
     countTokens: (text: string) => countTokens(initialized_state.tokenizer, text),
+    /**
+     * Formats text for tokenization with chat markers
+     * @param {string} text - Text to format
+     * @returns {string} Formatted text
+     */
     formatForTokenization: (text: string) => formatForTokenization(text)
   };
 };

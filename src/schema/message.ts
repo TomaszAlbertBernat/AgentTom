@@ -1,4 +1,4 @@
-import {sqliteTable, text, integer} from 'drizzle-orm/sqlite-core';
+import {sqliteTable, text, integer, index} from 'drizzle-orm/sqlite-core';
 import {sql, relations} from 'drizzle-orm';
 import {conversations} from './conversation';
 import {messageDocuments} from './messageDocuments';
@@ -13,7 +13,20 @@ export const messages = sqliteTable('messages', {
   multipart: text('multipart', {mode: 'json'}),
   created_at: text('created_at').default(sql`CURRENT_TIMESTAMP`),
   updated_at: text('updated_at').default(sql`CURRENT_TIMESTAMP`)
-});
+}, (table) => ({
+  // Index for conversation-based queries (most common)
+  conversationIdx: index('messages_conversation_idx').on(table.conversation_uuid),
+  // Index for role-based queries (filtering by message type)
+  roleIdx: index('messages_role_idx').on(table.role),
+  // Composite index for conversation + role queries
+  conversationRoleIdx: index('messages_conversation_role_idx').on(table.conversation_uuid, table.role),
+  // Composite index for conversation + created_at (for chronological message queries)
+  conversationCreatedIdx: index('messages_conversation_created_idx').on(table.conversation_uuid, table.created_at),
+  // Index for time-based queries
+  createdAtIdx: index('messages_created_at_idx').on(table.created_at),
+  // Index for content_type queries
+  contentTypeIdx: index('messages_content_type_idx').on(table.content_type),
+}));
 
 export const messagesRelations = relations(messages, ({one, many}) => ({
   conversation: one(conversations, {

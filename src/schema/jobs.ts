@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { text, integer, sqliteTable } from "drizzle-orm/sqlite-core";
+import { text, integer, sqliteTable, index } from "drizzle-orm/sqlite-core";
 import { tasks } from './task';
 
 export const jobs = sqliteTable('jobs', {
@@ -20,7 +20,24 @@ export const jobs = sqliteTable('jobs', {
   metadata: text('metadata', { mode: 'json' }),
   created_at: text('created_at').default(sql`CURRENT_TIMESTAMP`),
   updated_at: text('updated_at').default(sql`CURRENT_TIMESTAMP`)
-});
+}, (table) => ({
+  // Index for status-based queries (most common for job scheduling)
+  statusIdx: index('jobs_status_idx').on(table.status),
+  // Index for next_run queries (critical for cron job processing)
+  nextRunIdx: index('jobs_next_run_idx').on(table.next_run),
+  // Index for type-based queries
+  typeIdx: index('jobs_type_idx').on(table.type),
+  // Index for task-based queries
+  taskIdx: index('jobs_task_idx').on(table.task_uuid),
+  // Composite index for status + next_run (for efficient job scheduling)
+  statusNextRunIdx: index('jobs_status_next_run_idx').on(table.status, table.next_run),
+  // Index for last_run queries (for job history)
+  lastRunIdx: index('jobs_last_run_idx').on(table.last_run),
+  // Index for time-based queries
+  createdAtIdx: index('jobs_created_at_idx').on(table.created_at),
+  // Composite index for type + status (for filtering job types by status)
+  typeStatusIdx: index('jobs_type_status_idx').on(table.type, table.status),
+}));
 
 export const jobsRelations = relations(jobs, ({ one }) => ({
   task: one(tasks, {

@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { text, integer, sqliteTable } from "drizzle-orm/sqlite-core";
+import { text, integer, sqliteTable, index } from "drizzle-orm/sqlite-core";
 import { conversations } from './conversation';
 import { messageDocuments } from './messageDocuments';
 import { actionDocuments } from './actionDocuments';
@@ -17,7 +17,18 @@ export const documents = sqliteTable('documents', {
   metadata: text('metadata', { mode: 'json' }).notNull(),
   created_at: text('created_at').default(sql`CURRENT_TIMESTAMP`),
   updated_at: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => ({
+  // Index for conversation-based queries (most common)
+  conversationIdx: index('documents_conversation_idx').on(table.conversation_uuid),
+  // Index for source-based queries
+  sourceIdx: index('documents_source_idx').on(table.source_uuid),
+  // Composite index for conversation + created_at (for chronological queries)
+  conversationCreatedIdx: index('documents_conversation_created_idx').on(table.conversation_uuid, table.created_at),
+  // Index for time-based queries
+  createdAtIdx: index('documents_created_at_idx').on(table.created_at),
+  // Index for updated_at queries (for sync operations)
+  updatedAtIdx: index('documents_updated_at_idx').on(table.updated_at),
+}));
 
 export const documentsRelations = relations(documents, ({ one, many }) => ({
   conversation: one(conversations),

@@ -1,3 +1,10 @@
+/**
+ * Cron job management service for scheduled task execution.
+ * Handles creation, scheduling, and execution of recurring and one-time tasks.
+ * Supports cron expressions, scheduled execution, and recurring tasks.
+ * @module cron.service
+ */
+
 import { eq, and, lte, isNull } from 'drizzle-orm';
 import parser from 'cron-parser';
 import { v4 as uuidv4 } from 'uuid';
@@ -8,20 +15,41 @@ import type { Task } from '../../schema/task';
 import { taskService } from '../agent/task.service';
 import { conversationService } from '../agent/conversation.service';
 
+/**
+ * Parameters for creating a new cron job
+ * @interface CreateJobParams
+ */
 interface CreateJobParams {
+  /** Human-readable name for the job */
   name: string;
+  /** Type of job scheduling */
   type: 'cron' | 'scheduled' | 'recurring';
+  /** Schedule string (cron expression or ISO date) */
   schedule: string;
+  /** UUID of the task to execute */
   task_uuid: string;
+  /** Optional metadata for the job */
   metadata?: {
+    /** Job description */
     description?: string;
+    /** Additional custom properties */
     [key: string]: any;
   };
 }
 
+/**
+ * Cron service for managing scheduled jobs and task execution
+ * @namespace cronService
+ */
 export const cronService = {
+  /** Private interval reference for the job checker */
   private_interval: null as NodeJS.Timer | null,
 
+  /**
+   * Initializes the cron service with periodic job checking
+   * @param {number} check_interval - Interval in milliseconds for checking pending jobs (default: 60000)
+   * @returns {Promise<void>}
+   */
   async initialize(check_interval = 60000) {
     if (this.private_interval) {
       clearInterval(this.private_interval);
@@ -41,6 +69,17 @@ export const cronService = {
     console.log('Cron service initialized');
   },
 
+  /**
+   * Creates a new cron job with the specified parameters
+   * @param {CreateJobParams} params - Job creation parameters
+   * @param {string} params.name - Human-readable name for the job
+   * @param {'cron'|'scheduled'|'recurring'} params.type - Type of job scheduling
+   * @param {string} params.schedule - Schedule string (cron expression or ISO date)
+   * @param {string} params.task_uuid - UUID of the task to execute
+   * @param {Object} [params.metadata] - Optional metadata for the job
+   * @returns {Promise<Job>} The created job object
+   * @throws {Error} When job type is invalid or schedule parsing fails
+   */
   async createJob({ name, type, schedule, task_uuid, metadata }: CreateJobParams): Promise<Job> {
     let next_run: string;
 
@@ -75,6 +114,11 @@ export const cronService = {
     }
   },
 
+  /**
+   * Checks for pending jobs that are ready to be executed
+   * Converts times to Poland timezone and processes eligible jobs
+   * @returns {Promise<void>}
+   */
   async checkJobs() {
     // console.log('Checking for pending jobs...');
     try {
@@ -115,6 +159,12 @@ export const cronService = {
     }
   },
 
+  /**
+   * Processes a single job by executing it and updating its status
+   * Handles job state transitions, scheduling next runs, and error handling
+   * @param {Job} job - The job to process
+   * @returns {Promise<void>}
+   */
   async processJob(job: Job) {
     console.log(`Starting to process job ${job.uuid}`);
     try {
@@ -178,6 +228,12 @@ export const cronService = {
     }
   },
 
+  /**
+   * Executes a job by creating a conversation and task, then running it
+   * @param {Job} job - The job to execute
+   * @returns {Promise<any>} The execution result
+   * @throws {Error} When job execution fails
+   */
   async executeJob(job: Job) {
     console.log(`Executing job ${job.uuid}`);
     try {
@@ -230,6 +286,12 @@ export const cronService = {
     }
   },
 
+  /**
+   * Cancels a job by setting its status to 'cancelled'
+   * @param {string} job_uuid - UUID of the job to cancel
+   * @returns {Promise<void>}
+   * @throws {Error} When job cancellation fails
+   */
   async cancelJob(job_uuid: string): Promise<void> {
     try {
       await db
@@ -245,6 +307,12 @@ export const cronService = {
     }
   },
 
+  /**
+   * Retrieves a job by its UUID
+   * @param {string} job_uuid - UUID of the job to retrieve
+   * @returns {Promise<Job|null>} The job object or null if not found
+   * @throws {Error} When job retrieval fails
+   */
   async getJob(job_uuid: string): Promise<Job | null> {
     try {
       const [job] = await db
@@ -258,6 +326,11 @@ export const cronService = {
     }
   },
 
+  /**
+   * Cleans up the cron service by clearing the job checking interval
+   * Should be called when shutting down the application
+   * @returns {Promise<void>}
+   */
   async cleanup() {
     if (this.private_interval) {
       clearInterval(this.private_interval);
@@ -266,6 +339,13 @@ export const cronService = {
   }
 };
 
+/**
+ * Queries the AGI chat API to execute a scheduled task
+ * @param {string} conversation_uuid - UUID of the conversation to use
+ * @param {string} description - Description of the task to execute
+ * @returns {Promise<void>}
+ * @throws {Error} When API query fails or API key is missing
+ */
 async function queryAgiChat(conversation_uuid: string, description: string) {
   try {
     const base_url = process.env.APP_URL || 'http://localhost:3000';
