@@ -327,7 +327,18 @@ ${state.description ? `Description: ${state.description}` : ''}`
   }
 };
 
+/**
+ * Linear service for managing Linear project management tasks and issues
+ * @namespace linearService
+ */
 const linearService = {
+  /**
+   * Creates a new Linear issue
+   * @param {z.infer<typeof issueSchema>} payload - The issue creation payload
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
+   * @returns {Promise<Issue|null>} The created issue or null if creation failed
+   * @throws {Error} If issue creation fails
+   */
   createIssue: async (
     payload: z.infer<typeof issueSchema>, 
     span?: LangfuseSpanClient
@@ -371,6 +382,12 @@ const linearService = {
     }
   },
 
+  /**
+   * Creates multiple Linear issues in parallel
+   * @param {z.infer<typeof issueSchema>[]} issues - Array of issue creation payloads
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
+   * @returns {Promise<{successful: Issue[], failed: Array<{input: z.infer<typeof issueSchema>, error: Error}>}>} Results of the batch creation
+   */
   createManyIssues: async (
     issues: z.infer<typeof issueSchema>[], 
     span?: LangfuseSpanClient
@@ -416,6 +433,13 @@ const linearService = {
     return outcome;
   },
 
+  /**
+   * Updates an existing Linear issue
+   * @param {z.infer<typeof updateIssueSchema>} payload - The issue update payload
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
+   * @returns {Promise<Issue|null>} The updated issue or null if update failed
+   * @throws {Error} If issue update fails
+   */
   updateIssue: async (
     payload: z.infer<typeof updateIssueSchema>, 
     span?: LangfuseSpanClient
@@ -459,6 +483,13 @@ const linearService = {
     }
   },
 
+  /**
+   * Fetches Linear issues based on search criteria
+   * @param {z.infer<typeof searchIssuesSchema>} params - Search parameters
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
+   * @returns {Promise<Issue[]>} Array of matching issues
+   * @throws {Error} If issue fetching fails
+   */
   fetchIssues: async (
     params: z.infer<typeof searchIssuesSchema>, 
     span?: LangfuseSpanClient
@@ -509,6 +540,12 @@ const linearService = {
     }
   },
 
+  /**
+   * Fetches all Linear projects
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
+   * @returns {Promise<Project[]>} Array of all projects
+   * @throws {Error} If project fetching fails
+   */
   fetchProjects: async (span?: LangfuseSpanClient) => {
     try {
       span?.event({ name: 'linear_fetch_projects_start' });
@@ -531,6 +568,13 @@ const linearService = {
     }
   },
 
+  /**
+   * Fetches detailed information about a specific project
+   * @param {string} projectId - The ID of the project to fetch
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
+   * @returns {Promise<Project|null>} The project details or null if not found
+   * @throws {Error} If project fetching fails
+   */
   fetchProjectDetails: async (projectId: string, span?: LangfuseSpanClient): Promise<Project | null> => {
     try {
       span?.event({
@@ -559,6 +603,13 @@ const linearService = {
     }
   },
 
+  /**
+   * Fetches workflow states for a team
+   * @param {string} [teamId=DEFAULT_TEAM_ID] - The team ID to fetch states for
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
+   * @returns {Promise<WorkflowState[]>} Array of workflow states
+   * @throws {Error} If state fetching fails
+   */
   fetchTeamStates: async (teamId: string = DEFAULT_TEAM_ID, span?: LangfuseSpanClient): Promise<WorkflowState[]> => {
     try {
       span?.event({
@@ -592,6 +643,13 @@ const linearService = {
     }
   },
 
+  /**
+   * Formats an array of issues into a readable string
+   * @param {Issue[]} issues - Array of issues to format
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
+   * @returns {Promise<string>} Formatted string representation of issues
+   * @throws {Error} If formatting fails
+   */
   formatIssues: async (issues: Issue[], span?: LangfuseSpanClient): Promise<string> => {
     try {
       span?.event({
@@ -628,6 +686,14 @@ const linearService = {
     }
   },
 
+  /**
+   * Executes a Linear action with the given payload
+   * @param {string} action - The action to execute (must be one of LINEAR_ACTIONS)
+   * @param {unknown} payload - The action payload
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
+   * @returns {Promise<DocumentType>} Document containing the action result
+   * @throws {Error} If action execution fails
+   */
   execute: async (
     action: string,
     payload: unknown,
@@ -784,6 +850,11 @@ ${successful.map(issue => `- "${issue.title}" (${issue.id})`).join('\n')}`;
     }
   },
 
+  /**
+   * Gets context about recent tasks (last 7 days and next 7 days)
+   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
+   * @returns {Promise<DocumentType>} Document containing recent tasks context
+   */
   getRecentTasksContext: async (span?: LangfuseSpanClient): Promise<DocumentType> => {
     const today = new Date();
     const startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
