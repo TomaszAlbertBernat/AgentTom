@@ -1,4 +1,4 @@
-# AgenTTom AGI
+# AgentTom AGI
 
 ## Installation
 
