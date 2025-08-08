@@ -8,6 +8,8 @@
 import {z} from 'zod';
 import {LangfuseSpanClient} from 'langfuse';
 import {ElevenLabsClient} from 'elevenlabs';
+import { createLogger } from './logger.service';
+const ttsLog = createLogger('ElevenLabs');
 
 /**
  * Zod schema for ElevenLabs configuration validation
@@ -41,7 +43,7 @@ try {
     apiKey: process.env.ELEVENLABS_API_KEY
   });
 } catch (error) {
-  console.error('Failed to initialize ElevenLabs client. Check ELEVENLABS_API_KEY in .env. ElevenLabs is required for text-to-speech.');
+  ttsLog.error('Failed to initialize ElevenLabs client. Check ELEVENLABS_API_KEY in .env. ElevenLabs is required for text-to-speech.', error as Error);
   throw error;
 }
 

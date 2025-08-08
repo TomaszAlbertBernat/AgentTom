@@ -8,7 +8,7 @@ import { spotifyService } from '../services/tools/spotify.service';
 import { AppEnv } from '../types/hono';
 import { zValidator } from '@hono/zod-validator';
 import { db } from '../database';
-import { users } from '../schema/users';
+import { users } from '../schema/user';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -157,7 +157,7 @@ export const jwtMiddleware = async (c: any, next: any) => {
   }
   const token = authHeader.replace('Bearer ', '');
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const payload = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
     c.set('jwtPayload', payload);
     await next();
   } catch (err) {
@@ -182,18 +182,18 @@ auth.post('/register', zValidator('json', registerSchema), async (c) => {
   const hashedPassword = await bcrypt.hash(password, 10);
 
   // Create user
-  const user_id = uuidv4();
+  const user_uuid = uuidv4();
   await db.insert(users).values({
-    id: user_id,
+    uuid: user_uuid,
     email,
     password: hashedPassword,
     name,
-    created_at: new Date(),
-    updated_at: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
   });
 
   // Generate JWT
-  const token = jwt.sign({ user_id }, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '7d' });
+  const token = jwt.sign({ user_id: user_uuid }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '7d' });
 
   return c.json({ token });
 });
@@ -218,7 +218,7 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
   }
 
   // Generate JWT
-  const token = jwt.sign({ user_id: user.id }, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '7d' });
+  const token = jwt.sign({ user_id: user.uuid }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '7d' });
 
   return c.json({ token });
 });
@@ -228,7 +228,7 @@ auth.get('/me', jwtMiddleware, async (c) => {
   const user_id = (c.get('jwtPayload' as any) as any).user_id;
 
   const user = await db.query.users.findFirst({
-    where: eq(users.id, user_id),
+    where: eq(users.uuid, user_id),
   });
 
   if (!user) {
@@ -236,7 +236,7 @@ auth.get('/me', jwtMiddleware, async (c) => {
   }
 
   return c.json({
-    id: user.id,
+    id: user.uuid,
     email: user.email,
     name: user.name,
   });

@@ -22,7 +22,7 @@ import {
 import {completion, transcription} from '../common/llm.service';
 import {prompt as writePrompt} from '../../prompts/tools/file.write';
 import {v4 as uuidv4} from 'uuid';
-import db from '../../database/db';
+import { db } from '../../database';
 import { documents } from '../../schema/document';
 import {youtubeService} from './youtube.service';
 import { CoreMessage } from 'ai';

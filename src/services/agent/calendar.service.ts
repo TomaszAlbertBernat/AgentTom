@@ -7,6 +7,9 @@ import {documentService} from './document.service';
 import {stateManager} from './state.service';
 import type {DocumentType} from './document.service';
 import {createTextService} from '../common/text.service';
+import { createLogger } from '../common/logger.service';
+
+const log = createLogger('Agent:Calendar');
 
 // Initialize text service
 const text_service = await createTextService({model_name: 'gpt-4o'});
@@ -29,11 +32,11 @@ const eventSchema = z.object({
   location: z.string().optional(),
   start: z.object({
     dateTime: z.string(),
-    timeZone: z.string().optional().default('Europe/Warsaw')
+    timeZone: z.string().optional().default(process.env.APP_TIMEZONE || 'Europe/Warsaw')
   }),
   end: z.object({
     dateTime: z.string(),
-    timeZone: z.string().optional().default('Europe/Warsaw')
+    timeZone: z.string().optional().default(process.env.APP_TIMEZONE || 'Europe/Warsaw')
   })
 });
 
@@ -51,11 +54,11 @@ const eventUpdateSchema = z.object({
   location: z.string().optional(),
   start: z.object({
     dateTime: z.string(),
-    timeZone: z.string().optional().default('Europe/Warsaw')
+    timeZone: z.string().optional().default(process.env.APP_TIMEZONE || 'Europe/Warsaw')
   }),
   end: z.object({
     dateTime: z.string(),
-    timeZone: z.string().optional().default('Europe/Warsaw')
+    timeZone: z.string().optional().default(process.env.APP_TIMEZONE || 'Europe/Warsaw')
   })
 });
 
@@ -213,7 +216,7 @@ const createEvent = async (
 
     return response.data;
   } catch (error) {
-    console.error('Event creation error:', error);
+    log.error('Event creation error', error as Error);
     throw error;
   }
 };

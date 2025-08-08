@@ -8,12 +8,14 @@
 import { eq, and, lte, isNull } from 'drizzle-orm';
 import parser from 'cron-parser';
 import { v4 as uuidv4 } from 'uuid';
-import db from '../../database/db';
+import { db } from '../../database';
 import { jobs } from '../../schema/jobs';
 import type { Job, NewJob } from '../../schema/jobs';
 import type { Task } from '../../schema/task';
 import { taskService } from '../agent/task.service';
 import { conversationService } from '../agent/conversation.service';
+import { createLogger } from './logger.service';
+const cronLog = createLogger('CronService');
 
 /**
  * Parameters for creating a new cron job
@@ -44,6 +46,8 @@ interface CreateJobParams {
 export const cronService = {
   /** Private interval reference for the job checker */
   private_interval: null as NodeJS.Timer | null,
+  /** Service logger */
+  log: createLogger('CronService'),
 
   /**
    * Initializes the cron service with periodic job checking
@@ -55,18 +59,18 @@ export const cronService = {
       clearInterval(this.private_interval);
     }
     
-    console.log('Starting cron service with check interval:', check_interval);
+    this.log.startup('Starting cron service', { check_interval });
     this.private_interval = setInterval(async () => {
       try {
         await this.checkJobs();
       } catch (error) {
-        console.error('Error in checkJobs interval:', error);
+        this.log.error('Error in checkJobs interval', error as Error);
       }
     }, check_interval);
     
     // Run immediately on start
-    this.checkJobs().catch(error => console.error('Error in initial checkJobs:', error));
-    console.log('Cron service initialized');
+    this.checkJobs().catch(error => this.log.error('Error in initial checkJobs', error as Error));
+    this.log.startup('Cron service initialized');
   },
 
   /**
@@ -86,7 +90,7 @@ export const cronService = {
     try {
       if (type === 'cron') {
         const interval = parser.parseExpression(schedule, {
-          tz: 'Europe/Warsaw'
+          tz: process.env.APP_TIMEZONE || 'Europe/Warsaw'
         });
         next_run = interval.next().toDate().toISOString();
       } else if (type === 'scheduled' || type === 'recurring') {
@@ -109,7 +113,7 @@ export const cronService = {
       const [job] = await db.insert(jobs).values(newJob).returning();
       return job;
     } catch (error) {
-      console.error('Failed to create job:', error);
+      this.log.error('Failed to create job', error as Error);
       throw error;
     }
   },
@@ -122,9 +126,9 @@ export const cronService = {
   async checkJobs() {
     // console.log('Checking for pending jobs...');
     try {
-      // Convert current time to Poland timezone
+      // Convert current time to configured timezone
       const currentTime = new Date().toLocaleString('en-US', { 
-        timeZone: 'Europe/Warsaw',
+        timeZone: process.env.APP_TIMEZONE || 'Europe/Warsaw',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -134,7 +138,7 @@ export const cronService = {
         hour12: false
       }).replace(/(\d+)\/(\d+)\/(\d+),\s(\d+):(\d+):(\d+)/, '$3-$1-$2T$4:$5:$6Z');
 
-    //   console.log('Current time:', currentTime);
+    //   this.log.debug('Current time', { currentTime });
 
       const pending_jobs = await db
         .select()
@@ -146,16 +150,16 @@ export const cronService = {
           )
         );
 
-    //   console.log('Pending jobs:', pending_jobs);
+    //   this.log.debug('Pending jobs', { pending_jobs_count: pending_jobs.length });
 
-      console.log(`Found ${pending_jobs.length} pending jobs`);
+      this.log.info(`Found ${pending_jobs.length} pending jobs`);
 
       for (const job of pending_jobs) {
-        console.log(`Processing job: ${job.uuid} (${job.name})`);
+        this.log.info(`Processing job: ${job.uuid} (${job.name})`);
         await this.processJob(job);
       }
     } catch (error) {
-      console.error('Error checking jobs:', error);
+      this.log.error('Error checking jobs', error as Error);
     }
   },
 
@@ -166,13 +170,13 @@ export const cronService = {
    * @returns {Promise<void>}
    */
   async processJob(job: Job) {
-    console.log(`Starting to process job ${job.uuid}`);
+    this.log.debug(`Starting to process job ${job.uuid}`);
     try {
       await db
         .update(jobs)
         .set({ status: 'running' })
         .where(eq(jobs.uuid, job.uuid));
-      console.log(`Job ${job.uuid} marked as running`);
+      this.log.debug(`Job ${job.uuid} marked as running`);
 
       const conversation_uuid = uuidv4();
       const task = await taskService.createTasks(conversation_uuid, [{
@@ -185,17 +189,17 @@ export const cronService = {
       }]);
 
       const execution_result = await this.executeJob(job);
-      console.log(`Job ${job.uuid} executed with result:`, execution_result);
+      this.log.info(`Job ${job.uuid} executed`, { execution_result });
 
       let next_run: string | null = null;
       if (job.type === 'cron') {
         const interval = parser.parseExpression(job.schedule, {
           currentDate: new Date(),
           iterator: true,
-          tz: 'Europe/Warsaw'
+          tz: process.env.APP_TIMEZONE || 'Europe/Warsaw'
         });
         next_run = interval.next().value.toISOString();
-        console.log(`Next run for job ${job.uuid} scheduled at:`, next_run);
+        this.log.debug(`Next run for job ${job.uuid} scheduled`, { next_run });
       } else if (job.type === 'recurring') {
         next_run = new Date(job.schedule).toISOString();
       }
@@ -210,10 +214,10 @@ export const cronService = {
           updated_at: new Date().toISOString()
         })
         .where(eq(jobs.uuid, job.uuid));
-      console.log(`Job ${job.uuid} completed and updated`);
+      this.log.info(`Job ${job.uuid} completed and updated`);
 
     } catch (error: any) {
-      console.error(`Error processing job ${job.uuid}:`, error);
+      this.log.error(`Error processing job ${job.uuid}`, error as Error);
       await db
         .update(jobs)
         .set({
@@ -235,7 +239,7 @@ export const cronService = {
    * @throws {Error} When job execution fails
    */
   async executeJob(job: Job) {
-    console.log(`Executing job ${job.uuid}`);
+    this.log.debug(`Executing job ${job.uuid}`);
     try {
       const conversation_uuid = uuidv4();
       const metadata = typeof job.metadata === 'string' 
@@ -257,14 +261,11 @@ export const cronService = {
         uuid: null
       }];
 
-      console.log('Creating task with data:', {
-        conversation_uuid,
-        task_data
-      });
+      this.log.debug('Creating task with data', { conversation_uuid, task_count: task_data.length });
 
       const tasks = await taskService.createTasks(conversation_uuid, task_data);
 
-      console.log('Created tasks:', tasks);
+      this.log.debug('Created tasks', { count: tasks.length });
 
       if (!tasks.length || !tasks[0]) {
         throw new Error('Failed to create task');
@@ -281,7 +282,7 @@ export const cronService = {
         task_id: tasks[0].uuid
       };
     } catch (error) {
-      console.error(`Error executing job ${job.uuid}:`, error);
+      this.log.error(`Error executing job ${job.uuid}`, error as Error);
       throw error;
     }
   },
@@ -302,7 +303,7 @@ export const cronService = {
         })
         .where(eq(jobs.uuid, job_uuid));
     } catch (error) {
-      console.error('Error cancelling job:', error);
+      this.log.error('Error cancelling job', error as Error);
       throw error;
     }
   },
@@ -321,7 +322,7 @@ export const cronService = {
         .where(eq(jobs.uuid, job_uuid));
       return job || null;
     } catch (error) {
-      console.error('Error getting job:', error);
+      this.log.error('Error getting job', error as Error);
       throw error;
     }
   },
@@ -371,9 +372,9 @@ async function queryAgiChat(conversation_uuid: string, description: string) {
       throw new Error(`Failed to query AGI chat: ${response.status}`);
     }
 
-    console.log('AGI chat queried successfully');
+    cronLog.info('AGI chat queried successfully');
   } catch (error) {
-    console.error('Error querying AGI chat:', error);
+    cronLog.error('Error querying AGI chat', error as Error);
     throw error;
   }
 }

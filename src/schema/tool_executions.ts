@@ -1,15 +1,15 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import { tools } from './tools';
-import { users } from './users';
+import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
 
 export const tool_executions = sqliteTable('tool_executions', {
   id: text('id').primaryKey(),
-  tool_id: text('tool_id').notNull().references(() => tools.id),
-  user_id: text('user_id').notNull().references(() => users.id),
-  parameters: text('parameters').notNull(), // JSON string of parameters
+  tool_name: text('tool_name').notNull(),
+  tool_uuid: text('tool_uuid'),
+  user_uuid: text('user_uuid'),
+  parameters: text('parameters').notNull(),
   status: text('status', { enum: ['pending', 'completed', 'failed'] }).notNull(),
-  result: text('result'), // JSON string of result
+  result: text('result'),
   error: text('error'),
-  created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
-}); 
+  created_at: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+  updated_at: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
+});

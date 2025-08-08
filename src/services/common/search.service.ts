@@ -125,7 +125,7 @@ export const searchService = {
             document_uuid: result.payload.document_uuid
           });
         } else {
-          console.log(`Vector result excluded: document_uuid='${result.payload.document_uuid}'`);
+          searchLogger.trace('Vector result excluded', { document_uuid: result.payload.document_uuid });
         }
       });
 
@@ -144,7 +144,7 @@ export const searchService = {
             });
           }
         } else {
-          console.log(`Algolia hit excluded: document_uuid='${hit.document_uuid}'`);
+          searchLogger.trace('Algolia hit excluded', { document_uuid: hit.document_uuid });
         }
       });
 
@@ -161,10 +161,10 @@ export const searchService = {
           // Only include results that have both document and memory when content_type is 'memory'
           if (filters?.content_type === 'memory') {
             if (!memory) {
-              console.log(`Memory not found for document_uuid='${document_uuid}'`);
+              searchLogger.trace('Memory not found for document', { document_uuid });
               continue;
             }
-            console.log(`Including memory: uuid='${memory.uuid}', name='${memory.name}'`);
+            searchLogger.trace('Including memory', { memory_uuid: memory.uuid, name: memory.name });
           }
 
           final_results.push({
@@ -173,14 +173,14 @@ export const searchService = {
             memory
           });
         } else {
-          console.log(`Document not found: document_uuid='${document_uuid}'`);
+          searchLogger.trace('Document not found for uuid', { document_uuid });
         }
       }
 
       // Sort results by score in descending order
       return final_results.sort((a, b) => b.score - a.score);
     } catch (error) {
-      console.error('Failed to search:', error);
+      searchLogger.error('Failed to search', error as Error);
       throw error;
     }
   }
@@ -226,7 +226,7 @@ function matchesFilters(doc: any, filters: SearchFilters): boolean {
     const actual_value = doc[key];
     
     if (actual_value !== value) {
-      console.log(`Filter mismatch: key='${key}', filter_value='${value}', doc_value='${actual_value}'`);
+      searchLogger.trace('Filter mismatch', { key, filter_value: value, doc_value: actual_value });
       return false;
     }
   }

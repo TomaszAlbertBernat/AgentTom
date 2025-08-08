@@ -14,8 +14,22 @@ export const mimeTypes: MimeTypeConfig = {
     mimes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
   },
   [FileType.DOCUMENT]: {
-    extensions: [],
-    mimes: []
+    extensions: [
+      '.pdf',
+      '.doc', '.docx',
+      '.xls', '.xlsx',
+      '.ppt', '.pptx',
+      '.odt', '.ods', '.odp',
+      '.rtf', '.xml'
+    ],
+    mimes: [
+      'application/pdf',
+      'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.oasis.opendocument.text', 'application/vnd.oasis.opendocument.spreadsheet', 'application/vnd.oasis.opendocument.presentation',
+      'application/rtf', 'application/xml'
+    ]
   }
 };
 

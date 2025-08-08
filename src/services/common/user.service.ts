@@ -5,7 +5,7 @@
  * @module user.service
  */
 
-import db from '../../database/db';
+import { db } from '../../database';
 import {users} from '../../schema/user';
 import {eq, inArray} from 'drizzle-orm';
 import type {User} from '../../schema/user';

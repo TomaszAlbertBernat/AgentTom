@@ -290,7 +290,7 @@ export const createTextService = async (config: z.infer<typeof textServiceSchema
       try {
         return DocumentSchema.parse(chunk);
       } catch (error) {
-        console.error('Invalid document structure:', error);
+        // Avoid noisy console in tight loops; rethrow
         throw new Error('Failed to create valid document chunk');
       }
     });

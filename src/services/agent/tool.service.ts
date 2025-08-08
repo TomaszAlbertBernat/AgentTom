@@ -1,4 +1,4 @@
-import db from '../../database/db';
+import { db } from '../../database';
 import {tools, type Tool as DbTool} from '../../schema/tool';
 import {Tool} from '../../types/agent';
 

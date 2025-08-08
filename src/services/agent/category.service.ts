@@ -1,4 +1,4 @@
-import db from '../../database/db';
+import { db } from '../../database';
 import {categories, type Category} from '../../schema/category';
 import { and, eq } from 'drizzle-orm';
 

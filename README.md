@@ -1,144 +1,112 @@
 # AgentTom AGI
 
-## Installation
+AgentTom is an AI agent server built with Bun, Hono, and Drizzle (SQLite). It provides tool-augmented reasoning, document handling, and integrations (web, email, Linear, Spotify, etc.).
 
-1. Clone the repository
-2. Install dependencies using `bun install`
-3. Create `.env` file based on `.env.example` and set your own values, especially `OPENAI_API_KEY` (Anthropic's Claude isn't fully supported yet)
-4. Run the application using `bun run dev` — but before that, you need to run database migrations and seeds. Also, you need to set up the tools you want to use.
+## Quick start
 
-### Database, migrations & seeds
-
-AgentTom AGI uses `SQLite` as a database with `DrizzleORM`. To create the database and run migrations, you can use the following commands:
+1) Install dependencies
 
 ```bash
-bun generate
-bun migrate
-bun seed
+bun install
 ```
 
-You can check the database schema in `src/database/seed.ts` file to see what data is seeded.
+2) Configure environment
 
-Then you can start the application using `bun run dev`. 
+- Copy `.env-example` to `.env` and fill required values (at minimum set `APP_URL` and `OPENAI_API_KEY`). In development, `API_KEY` can be disabled.
+- Default port is 3000 (override with `PORT`).
 
-## Required services
+3) Initialize database
 
-These are the services that are required to be set up before running the application:
-
-- [OpenAI](https://platform.openai.com/api-keys): Set `OPENAI_API_KEY` in `.env` file.
-- [Anthropic](https://console.anthropic.com/keys): Set `ANTHROPIC_API_KEY` in `.env` file.
-- [Langfuse](https://cloud.langfuse.com): Set `LANGFUSE_API_KEY` in `.env` file.
-- [Algolia](https://www.algolia.com/): Set `ALGOLIA_APP_ID`, `ALGOLIA_API_KEY` and `ALGOLIA_INDEX_NAME` in `.env` file.
-- [Qdrant](https://qdrant.tech/): Set `QDRANT_INDEX`, `QDRANT_URL` and `QDRANT_API_KEY` in `.env` file.
-
-> Note: You may not be able to run this app with new OpenAI/Anthropic accounts due to rate limits.
-
-### Tools Configuration
-
-By default, several tools are already set up in the seed.ts and tools.config.ts files. You can use them as examples and blueprints for creating your own tools or customizing existing ones to suit your needs.
-
-#### Task Management
-
-As you can see in the seed file, there is a need to set up `stages UUIDs` and `projects UUIDs`.
-After setting env variables, you can get them by accessing `/api/tools/linear/states` and `/api/tools/linear/projects` endpoints and pasting them manually into the seed file or directly into the database.
-
-```env
-# Linear (linear.app/settings/api)
-LINEAR_API_KEY=
-LINEAR_TEAM_ID=          
-LINEAR_DEFAULT_ASSIGNEE_ID=
+```bash
+bun generate      # drizzle-kit generate
+bun migrate       # applies SQL migrations from src/database/migrations
+bun seed          # seeds sample data (users, conversations, memories, example tools)
 ```
 
-#### Calendar
-```env
-# Google Calendar - Create OAuth2 app (console.cloud.google.com/apis/credentials)
-# Enable Calendar API and configure OAuth consent screen
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=    
-GOOGLE_REDIRECT_URI=     # Auth: /api/auth/google
+4) Run the server
+
+```bash
+bun run dev
 ```
 
-#### Music
-```env
-# Spotify - Create OAuth2 app (developer.spotify.com/dashboard)
-# Add redirect URI and configure app settings
-SPOTIFY_CLIENT_ID=
-SPOTIFY_CLIENT_SECRET=   # Auth: /api/spotify/authorize
-```
+- Server: `http://localhost:3000`
+- API docs: `http://localhost:3000/docs`
+ - On startup, the app logs a service configuration summary (required/optional providers) via `logServiceStatus()`.
 
-#### Communication
-```env
-# ElevenLabs (elevenlabs.io/settings/keys)
-ELEVENLABS_API_KEY=
+## Environment
 
-# Resend (resend.com/api-keys)
-RESEND_API_KEY=
-```
+Key variables (see `.env-example` for the complete list):
 
-#### Web & Maps
-```env
-# Firecrawl (firecrawl.dev)
-FIRECRAWL_API_KEY=
+- Core: `APP_URL`, `PORT`, `OPENAI_API_KEY`
+- Optional providers: `ANTHROPIC_API_KEY`, `XAI_API_KEY`
+- Langfuse: `LANGFUSE_SECRET_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_BASEURL`
+- Search: `ALGOLIA_APP_ID`, `ALGOLIA_API_KEY`, `ALGOLIA_INDEX`
+- Vector DB: `QDRANT_URL`, `QDRANT_API_KEY`, `QDRANT_INDEX`
+- Google: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
+- Calendar app: `CALENDAR_CLIENT_ID`, `CALENDAR_CLIENT_SECRET`
+- Web: `FIRECRAWL_API_KEY`
+- Email: `RESEND_API_KEY`, `FROM_EMAIL`, `USER_EMAIL`
+- Speech: `ELEVENLABS_API_KEY`
+- Linear: `LINEAR_API_KEY`, `LINEAR_DEFAULT_TEAM_ID`, `LINEAR_DEFAULT_ASSIGNEE_ID`
+- Spotify: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`
+- Crypto: `COIN_MARKET_CAP_API_KEY`
+- Rate limit (optional): `REDIS_URL`
+- JWT (required for AGI endpoints): `JWT_SECRET`
+- Dev flags: `DISABLE_API_KEY` (default true in development), `APP_TIMEZONE` (default `Europe/Warsaw`)
 
-# Google Maps (console.cloud.google.com/apis/credentials)
-GOOGLE_MAPS_API_KEY=
-```
+Notes:
+- The previous `ALGOLIA_INDEX_NAME` has been standardized to `ALGOLIA_INDEX`.
+- The seed file uses `API_KEY` only to create a demo user token; global API auth uses a different mechanism (see below).
 
-#### File Storage
-```env
-# Local file system - no configuration needed
-# Files are stored in ./storage directory
-```
+## Authentication
 
-#### Crypto
-```env
-# CoinGecko API - no key needed for basic usage
-# Uses public API endpoints
-```
+- Global API middleware expects an API key in the `Authorization` header and validates it against the database `api_keys` table.
+  - Format: `Authorization: Bearer <api_key>`
+  - There is no public route to create API keys in this repository. Create one directly in the database using `src/services/common/api-key.service.ts` from a script, or disable the middleware during local development.
+- In addition, AGI routes under `/api/agi/*` use JWT.
+  - Obtain a JWT via `/api/auth/register` or `/api/auth/login`.
 
-Additional tools can be added by creating a new tool in the `src/services/tools` folder and adding it to the `src/config/tools.config.ts` file. To complete the setup, describe how to use the tool following the pattern of existing tools within the seed file at `src/database/seed.ts`.
+Important: In development you can set `DISABLE_API_KEY=true` to use JWT-only. In production, API-key validation remains enforced.
 
-## Concept
+## API
 
-The idea of AgenTTom aims for simplicity - creating a system that executes tasks based on natural language commands. While not omnipotent, it leverages existing apps, services, and devices the user regularly interacts with. The system performs actions by combining available capabilities with its long-term memory of user preferences and patterns.
+Mounted routes:
 
-Currently, it supports these tools and actions:
+- `/api/auth` — register/login and profile (`/register`, `/login`, `/me`)
+- `/api/agi` — simple chat/conversation endpoints
+  - `POST /api/agi/conversations` → create conversation
+  - `POST /api/agi/messages` → send a message (stores history and returns model response)
+- `/api/tools` — list and execute tools
+  - `GET /api/tools` → list tools (with availability)
+  - `POST /api/tools/execute` → execute a tool by name
+- `/api/users` — user CRUD (admin-style list/get/update)
+- `/api/linear` — Linear helper endpoints (`/projects`, `/states`, `/teams`, `/users`, `/setup`)
+- `/docs` — Swagger UI served from the in-repo OpenAPI spec
 
-  <img src="docs/images/agi-tools.png" width="600" style="border-radius: 6px; border: 1px solid #888; margin: 20px 0">
+Notes:
+- The following additional routes are mounted: `files`, `memory`, `text`, `web`, `spotify`.
 
-- Memory: supports storing and retrieving information
-- Web ([Firecrawl](https://www.firecrawl.dev/)): supports searching the web & loading content from URLs
-- Email ([Resend](https://resend.com/)): supports sending emails but only to verified addresses
-- Linear ([Linear](https://linear.app/)): supports managing issues
-- Calendar ([Google Calendar](https://calendar.google.com/)): supports managing calendar events within a single account
-- Map ([Google Maps](https://www.google.com/maps)): supports finding places and directions
-- Spotify ([Spotify](https://www.spotify.com/)): supports playing music and controlling playback
-- File: supports reading, writing and uploading files
-- Speech ([ElevenLabs](https://elevenlabs.io/)): supports text-to-speech
-- Search ([Algolia](https://www.algolia.com/) and [Qdrant](https://qdrant.tech/)): supports searching through indexed content
-- Crypto: supports checking prices of cryptocurrencies
+## Tools & integrations
 
-During the chat, the Large Language Model (LLM) determines which tools to use and how.
+Implemented tool services (accessible via `/api/tools/execute`):
 
-## Main logic
+- memory, web (Firecrawl), resend (email), file (load/write/upload), speak (system/ElevenLabs), linear, map, crypto (CoinMarketCap), image, calendar, spotify
 
-The main logic has two modes: fast-track and thinking. If the query is classified as a fast-track query, the system will rely solely on LLM's knowledge and skills to answer. Otherwise, it will go through the thinking phase that involves planning tasks and actions.
+The tool registry is in `src/config/tools.config.ts`. Tool payloads are validated against schemas in `src/config/tool-schemas.ts`.
 
-  <img src="docs/images/logic.png" width="600" style="border-radius: 6px; border: 1px solid #888; margin: 20px 0">
+Seeding: The default seed adds example tools (weather/calculator/translator) to demonstrate the DB structure. These examples are not implemented services. Use the tools listed above via the tools API or add your own to the registry and seed.
 
+## Models
 
-## Interaction
+Supported model IDs are configured in `src/config/llm.config.ts` (e.g., `gpt-4o`, `gpt-4o-mini`, `o1-preview`, `o1-mini`, `claude-3-5-sonnet-latest`).
 
-AgenTTom is available at `http://localhost:8080`. The main endpoint is `/api/agi/chat`, which is compatible with OpenAI's chat completions API. You can use:
+## Development notes
 
-- Siri Shortcuts for iOS (iPhone and Apple Watch)
-
-<img src="docs/images/custom.png" width="600" style="border-radius: 6px; margin: 20px 0">
-
-<img src="docs/images/example.png" width="600" style="border-radius: 6px; margin: 20px 0">
-
-<img src="docs/images/shortcuts.png" width="600" style="border-radius: 6px; margin: 20px 0">
+- Port: defaults to 3000; override with `PORT`.
+- OpenAPI: `GET /docs` (served from `src/config/openapi.config.ts`).
+- Rate limiting: uses Redis via `ioredis`. If you enable it, ensure a Redis instance and add `ioredis` to dependencies, or disable the middleware locally.
+ - Startup logs include a services matrix to quickly verify which integrations are configured.
 
 ## License
 
-This repo is mainly for my personal use, but feel free to explore the code, get inspired by the concepts, and adapt them for your projects. Just don't copy the entire project with its original name—I want to avoid any confusion.
+This repo is mainly for personal use. Feel free to explore and adapt ideas for your projects. Please do not copy the entire project under the original name.

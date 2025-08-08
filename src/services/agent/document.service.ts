@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import db from '../../database/db';
+import { db } from '../../database';
 import {documentHooks, documents, type Document} from '../../schema/document';
 import {ValidationError} from '../../utils/errors';
 import type {DocumentMetadata} from '../../types/document';
@@ -7,6 +7,7 @@ import {actionDocuments, taskDocuments} from '../../schema';
 import {v4 as uuidv4} from 'uuid';
 import {createTextService} from '../common/text.service';
 import {eq} from 'drizzle-orm';
+import { createLogger } from '../common/logger.service';
 
 const DocumentMetadataSchema = z.object({
   uuid: z.string(),
@@ -61,6 +62,7 @@ interface CreateErrorDocumentParams {
 const text_service = await createTextService({model_name: 'gpt-4o'});
 
 export const documentService = {
+  log: createLogger('DocumentService'),
   mapToDocumentType(document: Document): DocumentType {
     try {
       const parsed_metadata = typeof document.metadata === 'string' ? JSON.parse(document.metadata) : document.metadata;
@@ -236,7 +238,7 @@ export const documentService = {
 
       return documentService.mapToDocumentType(raw_document);
     } catch (error) {
-      console.error(`Failed to fetch document with UUID ${uuid}:`, error);
+      documentService.log.error(`Failed to fetch document with UUID ${uuid}`, error as Error);
       return null;
     }
   },

@@ -1,7 +1,7 @@
-import {User} from './user'; // Adjust import path as needed
+import type { ExternalChatRequest } from '../dto/chat.dto';
 
 export type AppEnv = {
   Variables: {
-    request: ExternalChatRequestDto;
+    request: ExternalChatRequest;
   };
 };

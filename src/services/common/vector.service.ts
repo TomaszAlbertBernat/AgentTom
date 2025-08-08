@@ -185,7 +185,7 @@ export const vectorService = {
         });
       }
     } catch (error) {
-      console.error('Failed to initialize Qdrant collection:', error);
+      vectorLogger.error('Failed to initialize Qdrant collection', error as Error);
       throw error;
     }
   },
@@ -235,7 +235,7 @@ export const vectorService = {
         }]
       });
     } catch (error) {
-      console.error('Failed to upsert point:', error);
+      vectorLogger.error('Failed to upsert point', error as Error);
       throw error;
     }
   },
@@ -258,7 +258,7 @@ export const vectorService = {
         points: document_uuids
       });
     } catch (error) {
-      console.error('Failed to delete points:', error);
+      vectorLogger.error('Failed to delete points', error as Error);
       throw error;
     }
   },
@@ -321,7 +321,7 @@ export const vectorService = {
           payload: result.payload as PointPayload
         }));
     } catch (error) {
-      console.error('Failed to search vectors:', error);
+      vectorLogger.error('Failed to search vectors', error as Error);
       throw error;
     }
   },
@@ -360,7 +360,7 @@ export const vectorService = {
         payload: point.payload as PointPayload
       }));
     } catch (error) {
-      console.error('Failed to get points by source:', error);
+      vectorLogger.error('Failed to get points by source', error as Error);
       throw error;
     }
   },
@@ -391,7 +391,7 @@ export const vectorService = {
         wait: true
       });
     } catch (error) {
-      console.error('Failed to update point payload:', error);
+      vectorLogger.error('Failed to update point payload', error as Error);
       throw error;
     }
   },
@@ -440,7 +440,7 @@ export const vectorService = {
         }]
       });
     } catch (error) {
-      console.error('Failed to update point:', error);
+      vectorLogger.error('Failed to update point', error as Error);
       throw error;
     }
   }

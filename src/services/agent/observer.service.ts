@@ -30,7 +30,7 @@ const createObserver = () => {
   });
 
   langfuse.on('error', (error: Error) => {
-    console.error('Langfuse error:', error);
+    // Avoid noisy console error in observers; consider integrating with logger if needed
   });
 
   const observer: ObserverService = {

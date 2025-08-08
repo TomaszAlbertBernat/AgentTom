@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import db from '../../database/db';
+import { db } from '../../database';
 import { memories, type Memory, type NewMemory } from '../../schema/memory';
 import { conversationMemories } from '../../schema/conversationMemories';
 import { eq, and, lt } from 'drizzle-orm';
@@ -20,6 +20,7 @@ import { memoryRecallPrompt } from '../../prompts/tools/memory.recall';
 import { memory_categories } from '../../config/memory.config';
 import { LangfuseSpanClient } from 'langfuse';
 import NodeCache from 'node-cache';
+import { createLogger } from '../common/logger.service';
 
 // cSpell:ignore checkperiod
 
@@ -134,6 +135,7 @@ const MemoryActionSchema = z.discriminatedUnion('action', [
  * @namespace memoryService
  */
 export const memoryService = {
+  log: createLogger('MemoryService'),
   /**
    * Creates a new memory record in the database
    * @param {NewMemory} data - Memory data to create
@@ -271,7 +273,7 @@ export const memoryService = {
       
       return memories_with_documents.slice(0, limit);
     } catch (error) {
-      console.error('Memory search failed:', error);
+      memoryService.log.error('Memory search failed', error as Error);
       return [];
     }
   },
@@ -307,7 +309,7 @@ export const memoryService = {
 
       const all_results = await Promise.all(search_promises);
 
-      console.log(all_results)
+      memoryService.log.debug('Recall search results aggregated', { batches: all_results.length });
       
       // Deduplicate results by memory_uuid
       const unique_memories = new Map<string, MemoryWithDocument>();
@@ -342,7 +344,7 @@ export const memoryService = {
         }
       });
     } catch (error) {
-      console.error('Memory recall failed:', error);
+      memoryService.log.error('Memory recall failed', error as Error);
       throw error;
     }
   },
@@ -539,7 +541,7 @@ export const memoryService = {
     const parsed = MemoryActionSchema.parse({ action, payload });
     const conversation_uuid = parsed.payload.conversation_uuid || 'default';
 
-    console.log(parsed)
+    memoryService.log.debug('Execute memory action parsed', { action: parsed.action });
     switch (parsed.action) {
       case 'recall': {
         const { query, filters, limit, conversation_uuid } = parsed.payload;
@@ -574,7 +576,7 @@ export const memoryService = {
   },
 
   async getMemoryByDocumentUuid(document_uuid: string): Promise<Memory | undefined> {
-    console.log(`Fetching memory for document_uuid='${document_uuid}'`);
+    memoryService.log.debug('Fetching memory by document UUID', { document_uuid });
     
     const [memory] = await db
       .select()
@@ -582,9 +584,9 @@ export const memoryService = {
       .where(eq(memories.document_uuid, document_uuid));
 
     if (memory) {
-      console.log(`Memory found: uuid='${memory.uuid}', name='${memory.name}'`);
+      memoryService.log.debug('Memory found for document', { memory_uuid: memory.uuid, name: memory.name });
     } else {
-      console.log(`No memory found for document_uuid='${document_uuid}'`);
+      memoryService.log.debug('No memory found for document', { document_uuid });
     }
 
     return memory;
@@ -667,7 +669,7 @@ export const memoryService = {
       // Clear cache after pruning
       memoryCache.flushAll();
     } catch (error) {
-      console.error('Memory pruning failed:', error);
+      memoryService.log.error('Memory pruning failed', error as Error);
     }
   }
 };

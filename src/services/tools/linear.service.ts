@@ -11,6 +11,8 @@ import { stateManager } from '../agent/state.service';
 import { documentService } from '../agent/document.service';
 import type { DocumentType } from '../agent/document.service';
 import { IssueFilter } from '@linear/sdk/dist/_generated_documents';
+import { createLogger } from '../common/logger.service';
+const log = createLogger('Tools:Linear');
 
 
 const DEFAULT_TEAM_ID = process.env.LINEAR_DEFAULT_TEAM_ID || '';
@@ -24,7 +26,7 @@ if (process.env.LINEAR_API_KEY) {
       apiKey: process.env.LINEAR_API_KEY 
     });
   } catch (error) {
-    console.error('Failed to initialize Linear client:', error);
+    log.error('Failed to initialize Linear client', error as Error);
   }
 }
 

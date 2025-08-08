@@ -6,11 +6,19 @@
 
 import { Context, Next } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { Redis } from 'ioredis';
+let RedisCtor: any = null;
+try {
+  // Dynamically require to avoid hard dependency in dev
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  RedisCtor = require('ioredis').Redis;
+} catch (_) {
+  RedisCtor = null;
+}
 import { logger } from '../services/common/logger.service';
 
-// Initialize Redis client
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+// Initialize Redis client if available and configured
+const hasRedisUrl = typeof process.env.REDIS_URL === 'string' && process.env.REDIS_URL.length > 0;
+const redis = RedisCtor && hasRedisUrl ? new RedisCtor(process.env.REDIS_URL) : null;
 
 interface RateLimitOptions {
   max: number;        // maximum requests
@@ -39,6 +47,10 @@ export const rateLimit = (options: RateLimitOptions) => {
 
   return async (c: Context, next: Next) => {
     try {
+      // If Redis is not configured, pass-through without rate limiting (dev-friendly)
+      if (!redis) {
+        return next();
+      }
       // Get client identifier (IP or user ID)
       const ip = c.req.header('x-forwarded-for') || 'unknown';
       const userId = c.get('request')?.user?.id;

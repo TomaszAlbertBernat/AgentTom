@@ -21,6 +21,7 @@ import {prompt as pickResourcesPrompt} from '../../prompts/tools/search.pick';
 import {completion} from '../common/llm.service';
 import {stateManager} from '../agent/state.service';
 import {createTextService} from '../common/text.service';
+import { createLogger } from '../common/logger.service';
 
 /**
  * Environment schema for validating required API keys
@@ -76,6 +77,7 @@ type ScrapeResult = ScrapeResponse | ErrorResponse;
  * @namespace webService
  */
 const webService = {
+  log: createLogger('Tools:Web'),
   /**
    * Creates a Firecrawl client instance with API key validation
    * @returns Configured FirecrawlApp instance
@@ -313,7 +315,7 @@ const webService = {
               query: q
             };
           } catch (error) {
-            console.error(`Failed to scrape ${url}:`, error);
+            webService.log.error(`Failed to scrape ${url}`, error as Error);
             return null;
           }
         })
@@ -376,7 +378,7 @@ const webService = {
       });
     }
 
-    if (action === 'get_contents') {
+    if (action === 'getContents') {
       const { url } = getContentsPayloadSchema.parse(payload);
       span?.event({
         name: 'web_tool',

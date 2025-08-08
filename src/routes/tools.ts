@@ -6,9 +6,11 @@ import { db } from '../database';
 import { tools } from '../schema/tool';
 import { tool_executions } from '../schema/tool_executions';
 import { eq, desc } from 'drizzle-orm';
-import { toolsMap } from '../config/tools.config';
+import { toolsMap, validateToolPayload } from '../config/tools.config';
+import { createLogger } from '../services/common/logger.service';
 
 const tools_router = new Hono();
+const log = createLogger('Routes:Tools');
 
 // Interface for JWT payload
 interface JwtPayload {
@@ -24,6 +26,7 @@ interface AppContext {
 // Enhanced validation schemas
 const executeToolSchema = z.object({
   tool_name: z.string().min(1, 'Tool name is required'),
+  action: z.string().min(1, 'Action is required'),
   parameters: z.record(z.any()).default({}),
   timeout: z.number().min(1000).max(300000).optional().default(30000), // 30s default, max 5min
 });
@@ -70,7 +73,7 @@ tools_router.get('/', async (c) => {
       count: toolsWithStatus.length 
     });
   } catch (error) {
-    console.error('Error fetching tools:', error);
+    log.error('Error fetching tools', error as Error);
     return c.json({ 
       success: false,
       error: 'Failed to fetch tools',
@@ -81,7 +84,7 @@ tools_router.get('/', async (c) => {
 
 // Execute tool with comprehensive error handling
 tools_router.post('/execute', zValidator('json', executeToolSchema), async (c) => {
-  const { tool_name, parameters, timeout } = c.req.valid('json');
+  const { tool_name, action, parameters, timeout } = c.req.valid('json');
   
   // Create execution record immediately
   const execution_id = uuidv4();
@@ -131,11 +134,14 @@ tools_router.post('/execute', zValidator('json', executeToolSchema), async (c) =
       }, 404);
     }
 
+    // Validate payload against schema
+    const validatedPayload = validateToolPayload(tool_name as keyof typeof toolsMap, action, parameters);
+
     // Log execution start
     await logExecution(execution_id, tool_name, parameters, 'pending', null, start_time);
 
     // Execute tool with timeout
-    const result = await executeToolWithTimeout(toolImplementation, tool_name, parameters, timeout);
+    const result = await executeToolWithTimeout(toolImplementation, tool_name, action, validatedPayload as any, timeout);
     const execution_time = Date.now() - start_time;
 
     // Log successful execution
@@ -184,7 +190,7 @@ tools_router.get('/executions', async (c) => {
       count: executions.length 
     });
   } catch (error) {
-    console.error('Error fetching executions:', error);
+    log.error('Error fetching executions', error as Error);
     return c.json({ 
       success: false,
       error: 'Failed to fetch execution history',
@@ -259,7 +265,13 @@ tools_router.post('/test-error-handling', async (c) => {
 });
 
 // Helper function to execute tools with timeout
-async function executeToolWithTimeout(toolImplementation: any, toolName: string, parameters: Record<string, any>, timeoutMs: number) {
+async function executeToolWithTimeout(
+  toolImplementation: any,
+  toolName: string,
+  action: string,
+  parameters: Record<string, any>,
+  timeoutMs: number
+) {
   return new Promise(async (resolve, reject) => {
     const timeoutId = setTimeout(() => {
       reject(createToolError(
@@ -272,7 +284,7 @@ async function executeToolWithTimeout(toolImplementation: any, toolName: string,
 
     try {
       // Execute the tool
-      const result = await toolImplementation.execute('execute', parameters);
+      const result = await toolImplementation.execute(action, parameters);
       clearTimeout(timeoutId);
       resolve(result);
     } catch (error) {
@@ -308,12 +320,12 @@ async function logExecution(
   try {
     const execution_data = {
       id: execution_id,
-      tool_id: tool_name, // Using tool name as ID for now
-      user_id: 'system', // Default user for now
+      tool_name: tool_name,
+      user_uuid: 'system',
       parameters: JSON.stringify(parameters),
       status,
-      created_at: new Date(start_time || Date.now()),
-      updated_at: new Date(),
+      created_at: new Date(start_time || Date.now()).toISOString(),
+      updated_at: new Date().toISOString(),
       ...(result && { result: JSON.stringify(result) }),
       ...(error && { 
         error: JSON.stringify({
@@ -335,7 +347,7 @@ async function logExecution(
       await db.update(tool_executions)
         .set({
           status,
-          updated_at: new Date(),
+          updated_at: new Date().toISOString(),
           ...(result && { result: JSON.stringify(result) }),
           ...(error && { 
             error: JSON.stringify({
@@ -352,7 +364,7 @@ async function logExecution(
       await db.insert(tool_executions).values(execution_data);
     }
   } catch (logError) {
-    console.error('Failed to log execution:', logError);
+    log.error('Failed to log execution', logError as Error);
     // Don't throw here to avoid breaking the main execution flow
   }
 }

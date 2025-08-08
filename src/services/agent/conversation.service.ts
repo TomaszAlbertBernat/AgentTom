@@ -1,8 +1,9 @@
-import db from '../../database/db';
+import { db } from '../../database';
 import {conversations, type NewConversation} from '../../schema/conversation';
 import {v4 as uuidv4} from 'uuid';
 import {eq, desc} from 'drizzle-orm';
 import {messages} from '../../schema/message';
+import { createLogger } from '../common/logger.service';
 
 interface CreateConversationParams {
   uuid: string;
@@ -69,7 +70,8 @@ export const conversationService = {
   },
 
   getRecentConversations: async ({user_id, limit = 10}: GetConversationsParams) => {
-    console.log('...', user_id);
+    const log = createLogger('ConversationService');
+    log.debug('Fetching recent conversations', { user_id, limit });
     try {
       const conversations_list = await db
         .select()

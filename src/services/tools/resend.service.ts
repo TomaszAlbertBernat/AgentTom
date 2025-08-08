@@ -8,7 +8,9 @@ import type {DocumentType} from '../agent/document.service';
 import { stateManager } from '../agent/state.service';
 import {documents} from '../../schema/document';
 import {eq} from 'drizzle-orm';
-import db from '../../database/db';
+import { createLogger } from '../common/logger.service';
+
+const log = createLogger('Tools:Resend');
 
 const envSchema = z.object({
   RESEND_API_KEY: z.string(),
@@ -124,7 +126,7 @@ const resendService = {
           content: Buffer.from(text)
         });
       } catch (error) {
-        console.error(`Failed to process attachment ${uuid}:`, error);
+        log.error(`Failed to process attachment ${uuid}`, error as Error);
       }
     }
 

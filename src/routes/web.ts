@@ -4,6 +4,7 @@ import { webService } from '../services/tools/web.service';
 import { validateBody } from '../middleware/validation';
 import { WebSchemas, CommonSchemas } from '../validation/schemas';
 import { z } from 'zod';
+import { getServiceStatus } from '../config/env.config';
 
 // Extend Hono context for validated data access
 declare module 'hono' {
@@ -85,6 +86,11 @@ const web = new Hono<AppEnv>()
         }
       }, 500);
     }
+  })
+  .get('/health', c => c.json({ status: 'ok' }))
+  .get('/health/details', c => {
+    const status = getServiceStatus();
+    return c.json({ status: 'ok', ...status });
   });
 
 export default web; 

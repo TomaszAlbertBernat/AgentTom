@@ -116,19 +116,8 @@ export const sanitize = () => {
         c.set('query', sanitizeObject(query));
       }
 
-      // Sanitize request body for non-multipart requests
-      const contentType = c.req.header('Content-Type') || '';
-      if (!contentType.includes('multipart/form-data')) {
-        try {
-          const body = await c.req.json();
-          c.set('body', sanitizeObject(body));
-        } catch (error) {
-          // Ignore JSON parsing errors for non-JSON requests
-          if (contentType.includes('application/json')) {
-            throw error;
-          }
-        }
-      }
+      // Do not parse/sanitize JSON body here to avoid consuming the stream.
+      // Body should be parsed by validation middleware or route handlers.
 
       // Sanitize URL parameters
       const params = c.req.param();

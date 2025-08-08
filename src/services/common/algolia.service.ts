@@ -1,4 +1,6 @@
 import algoliasearch from 'algoliasearch';
+import { createLogger } from './logger.service';
+const algoliaLog = createLogger('AlgoliaService');
 import type { SearchIndex } from 'algoliasearch';
 import type { DocumentType } from '../agent/document.service';
 
@@ -50,7 +52,7 @@ try {
   );
   index = client.initIndex(DOCUMENTS_INDEX);
 } catch (error) {
-  console.error('Failed to initialize Algolia client. Check ALGOLIA_APP_ID and ALGOLIA_API_KEY in .env. Algolia is required for indexing.');
+  algoliaLog.error('Failed to initialize Algolia client. Check ALGOLIA_APP_ID and ALGOLIA_API_KEY in .env. Algolia is required for indexing.', error as Error);
 }
 
 /**
@@ -135,7 +137,7 @@ export const algoliaService = {
   async indexDocument(document: DocumentType): Promise<void> {
     try {
       if (!index) {
-        console.warn('Algolia client not initialized, skipping document indexing');
+        algoliaLog.warn('Algolia client not initialized, skipping document indexing');
         return;
       }
 
@@ -162,11 +164,11 @@ export const algoliaService = {
         metadata: metadata as unknown as Record<string, unknown>
       };
 
-      console.log('Indexing document to Algolia:', algolia_document);
+      algoliaLog.debug('Indexing document to Algolia', { objectID: algolia_document.objectID, source: algolia_document.source });
 
       await index.saveObject(algolia_document);
     } catch (error) {
-      console.error('Failed to index document in Algolia:', error);
+      algoliaLog.error('Failed to index document in Algolia', error as Error);
       throw error;
     }
   },
@@ -195,7 +197,7 @@ export const algoliaService = {
   async updateDocument(document: DocumentType): Promise<void> {
     try {
       if (!index) {
-        console.warn('Algolia client not initialized, skipping document update');
+        algoliaLog.warn('Algolia client not initialized, skipping document update');
         return;
       }
 
@@ -216,7 +218,7 @@ export const algoliaService = {
         ...metadata
       });
     } catch (error) {
-      console.error('Failed to update document in Algolia:', error);
+      algoliaLog.error('Failed to update document in Algolia', error as Error);
       throw error;
     }
   },
@@ -235,12 +237,12 @@ export const algoliaService = {
   async deleteDocument(uuid: string): Promise<void> {
     try {
       if (!index) {
-        console.warn('Algolia client not initialized, skipping document deletion');
+        algoliaLog.warn('Algolia client not initialized, skipping document deletion');
         return;
       }
       await index.deleteObject(uuid);
     } catch (error) {
-      console.error('Failed to delete document from Algolia:', error);
+      algoliaLog.error('Failed to delete document from Algolia', error as Error);
       throw error;
     }
   },
@@ -285,7 +287,7 @@ export const algoliaService = {
   }): Promise<any> {
     try {
       if (!index) {
-        console.warn('Algolia client not initialized, returning empty search results');
+        algoliaLog.warn('Algolia client not initialized, returning empty search results');
         return { hits: [], nbHits: 0, page: 0, nbPages: 0 };
       }
 
@@ -297,7 +299,7 @@ export const algoliaService = {
 
       return index.search(query, searchOptions);
     } catch (error) {
-      console.error('Failed to search documents in Algolia:', error);
+      algoliaLog.error('Failed to search documents in Algolia', error as Error);
       throw error;
     }
   }

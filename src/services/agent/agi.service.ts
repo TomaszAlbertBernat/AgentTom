@@ -11,6 +11,7 @@ import {memoryService} from './memory.service';
 import {actionService} from './action.service';
 import {Document} from '../../types/document';
 import {taskService} from './task.service';
+import { createLogger } from '../common/logger.service';
 
 export const shouldContinueThinking = (): boolean => {
   const state = stateManager.getState();
@@ -76,7 +77,7 @@ export const setInteractionState = async (request: ChatRequest) => {
     max_tokens: request.max_tokens || 16384,
     time: new Date()
       .toLocaleString('en-GB', {
-        timeZone: 'Europe/Warsaw',
+        timeZone: process.env.APP_TIMEZONE || 'Europe/Warsaw',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -140,6 +141,7 @@ interface UpdateActionStateParams {
 }
 
 export const updateActionState = async ({action_uuid, result}: {action_uuid: string; result: unknown}) => {
+  const log = createLogger('AGIService');
   // 1. Update the action with result and get formatted result back
   const updated_action = await actionService.updateActionWithResult(action_uuid, result);
   
@@ -159,7 +161,8 @@ export const updateActionState = async ({action_uuid, result}: {action_uuid: str
     );
     
     if (updated_actions.find(action => action.uuid === action_uuid)) {
-      console.log('updated_actions', updated_actions.find(action => action.uuid === action_uuid)?.name + ' with the result: ' + updated_action.result);
+      const actionName = updated_actions.find(action => action.uuid === action_uuid)?.name;
+      log.debug('Action updated with result', { actionName });
     }
     
     return { ...task, actions: updated_actions };

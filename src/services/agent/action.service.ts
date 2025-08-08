@@ -1,4 +1,4 @@
-import db from '../../database/db';
+import { db } from '../../database';
 import {actions} from '../../schema/action';
 import {eq} from 'drizzle-orm';
 import {z} from 'zod';

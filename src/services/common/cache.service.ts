@@ -5,7 +5,13 @@
  * @module cache.service
  */
 
-import { Redis } from 'ioredis';
+let RedisCtor: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  RedisCtor = require('ioredis').Redis;
+} catch (_) {
+  RedisCtor = null;
+}
 import { logger } from './logger.service';
 
 /** Component logger for cache service operations */
@@ -15,13 +21,18 @@ const cacheLogger = logger.child('CACHE_SERVICE');
  * Initialize Redis client with connection handling and error recovery
  * @constant {Redis}
  */
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+const hasRedisUrl = typeof process.env.REDIS_URL === 'string' && process.env.REDIS_URL.length > 0;
+const redis = RedisCtor && hasRedisUrl ? new RedisCtor(process.env.REDIS_URL) : null as any;
 
 // Add event handlers after initialization
-redis.on('connect', () => cacheLogger.info('Redis connected successfully'));
-redis.on('ready', () => cacheLogger.info('Redis ready for operations'));
-redis.on('error', (error: Error) => cacheLogger.error('Redis connection error', error));
-redis.on('close', () => cacheLogger.warn('Redis connection closed'));
+if (redis) {
+  redis.on('connect', () => cacheLogger.info('Redis connected successfully'));
+  redis.on('ready', () => cacheLogger.info('Redis ready for operations'));
+  redis.on('error', (error: Error) => cacheLogger.error('Redis connection error', error));
+  redis.on('close', () => cacheLogger.warn('Redis connection closed'));
+} else {
+  cacheLogger.warn('Redis disabled (missing REDIS_URL or ioredis). Cache will no-op.');
+}
 
 /**
  * Interface for cache configuration options
@@ -134,6 +145,7 @@ export const cacheService = {
       const cacheKey = this._generateKey(key, config.namespace);
       const serializedValue = this._serialize(value, config.compress);
 
+      if (!redis) return false;
       const result = await redis.setex(cacheKey, config.ttl, serializedValue);
       
       cacheLogger.debug('Cache set operation', {
@@ -160,6 +172,7 @@ export const cacheService = {
       const config = { ...DEFAULT_OPTIONS, ...options };
       const cacheKey = this._generateKey(key, config.namespace);
 
+      if (!redis) return null;
       const cachedData = await redis.get(cacheKey);
       
       if (cachedData === null) {
@@ -191,6 +204,7 @@ export const cacheService = {
       const config = { ...DEFAULT_OPTIONS, ...options };
       const cacheKey = this._generateKey(key, config.namespace);
 
+      if (!redis) return false;
       const result = await redis.del(cacheKey);
       
       cacheLogger.debug('Cache delete operation', {
@@ -216,6 +230,7 @@ export const cacheService = {
       const config = { ...DEFAULT_OPTIONS, ...options };
       const searchPattern = this._generateKey(pattern, config.namespace);
 
+      if (!redis) return 0;
       const keys = await redis.keys(searchPattern);
       
       if (keys.length === 0) {
@@ -248,6 +263,7 @@ export const cacheService = {
       const config = { ...DEFAULT_OPTIONS, ...options };
       const cacheKey = this._generateKey(key, config.namespace);
 
+      if (!redis) return false;
       const result = await redis.exists(cacheKey);
       return result === 1;
     } catch (error) {
@@ -267,6 +283,7 @@ export const cacheService = {
       const config = { ...DEFAULT_OPTIONS, ...options };
       const cacheKey = this._generateKey(key, config.namespace);
 
+      if (!redis) return -2;
       return await redis.ttl(cacheKey);
     } catch (error) {
       cacheLogger.error('Cache TTL check failed', error as Error, { key });
@@ -344,6 +361,7 @@ export const cacheService = {
    */
   async close(): Promise<void> {
     try {
+      if (!redis) return;
       await redis.quit();
       cacheLogger.info('Redis connection closed gracefully');
     } catch (error) {

@@ -1,4 +1,4 @@
-import db from '../../database/db';
+import { db } from '../../database';
 import {messages, type NewMessage} from '../../schema/message';
 import {v4 as uuidv4} from 'uuid';
 import {CoreMessage} from 'ai';

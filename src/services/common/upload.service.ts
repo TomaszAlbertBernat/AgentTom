@@ -12,6 +12,8 @@ import {v4 as uuidv4} from 'uuid';
 import {FileType, UploadResult} from '../../types/upload';
 import {mimeTypes} from '../../config/mime.config';
 import {glob} from 'glob';
+import { createLogger } from './logger.service';
+const uploadLog = createLogger('UploadService');
 
 /**
  * Custom error class for file validation errors
@@ -90,7 +92,7 @@ export const tempFile = {
           try {
             await unlink(temp_path);
           } catch (error) {
-            console.error(`Failed to cleanup temp file ${temp_path}:`, error);
+            uploadLog.warn('Failed to cleanup temp file', { temp_path, error: (error as Error).message });
           }
         }
       };
@@ -195,7 +197,7 @@ export const findFileByUuid = async (uuid: string): Promise<FileResponse | null>
       original_name
     };
   } catch (error) {
-    console.error('Error finding file:', error);
+    uploadLog.error('Error finding file', error as Error);
     return null;
   }
 };

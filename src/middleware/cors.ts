@@ -48,20 +48,26 @@ export const cors = (config: CorsConfig = {}) => {
 
   return async (c: Context, next: Next) => {
     const origin = c.req.header('Origin');
+    const isProduction = (process.env.NODE_ENV || 'development') === 'production';
 
     // Handle preflight requests
     if (c.req.method === 'OPTIONS') {
       // Set CORS headers
       if (origin) {
-        c.header('Access-Control-Allow-Origin', origin);
+        // If credentials are used, echo specific origin (not *)
+        const allowWildcard = corsConfig.origin === '*';
+        const allowCredentials = !!corsConfig.credentials;
+
+        if (allowCredentials) {
+          c.header('Access-Control-Allow-Origin', origin);
+          c.header('Access-Control-Allow-Credentials', 'true');
+        } else {
+          c.header('Access-Control-Allow-Origin', allowWildcard ? '*' : origin);
+        }
         c.header('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
         c.header('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
         c.header('Access-Control-Expose-Headers', corsConfig.exposedHeaders.join(', '));
         c.header('Access-Control-Max-Age', corsConfig.maxAge.toString());
-        
-        if (corsConfig.credentials) {
-          c.header('Access-Control-Allow-Credentials', 'true');
-        }
       }
       
       return c.text('', 204);
@@ -77,16 +83,28 @@ export const cors = (config: CorsConfig = {}) => {
       } else if (Array.isArray(corsConfig.origin)) {
         allowOrigin = corsConfig.origin.includes(origin);
       } else {
-        allowOrigin = corsConfig.origin === '*' || corsConfig.origin === origin;
+        if (corsConfig.origin === '*') {
+          allowOrigin = true;
+        } else if (typeof corsConfig.origin === 'string' && corsConfig.origin.includes(',')) {
+          const list = corsConfig.origin.split(',').map((o) => o.trim()).filter(Boolean);
+          allowOrigin = list.includes(origin);
+        } else {
+          allowOrigin = corsConfig.origin === origin;
+        }
       }
 
       if (allowOrigin) {
-        c.header('Access-Control-Allow-Origin', origin);
-        c.header('Access-Control-Expose-Headers', corsConfig.exposedHeaders.join(', '));
-        
-        if (corsConfig.credentials) {
+        const allowWildcard = corsConfig.origin === '*';
+        const allowCredentials = !!corsConfig.credentials;
+
+        if (allowCredentials) {
+          // With credentials, echo the specific origin (not *)
+          c.header('Access-Control-Allow-Origin', origin);
           c.header('Access-Control-Allow-Credentials', 'true');
+        } else {
+          c.header('Access-Control-Allow-Origin', allowWildcard ? '*' : origin);
         }
+        c.header('Access-Control-Expose-Headers', corsConfig.exposedHeaders.join(', '));
       }
     }
 
@@ -95,7 +113,9 @@ export const cors = (config: CorsConfig = {}) => {
     c.header('X-Frame-Options', 'DENY');
     c.header('X-XSS-Protection', '1; mode=block');
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-    c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    if (isProduction) {
+      c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
     
     // Content Security Policy
     c.header('Content-Security-Policy', [

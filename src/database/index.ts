@@ -1,10 +1,6 @@
 import { drizzle } from 'drizzle-orm/libsql';
 import { createClient } from '@libsql/client';
-import * as schema from '../schema/users';
-import * as conversationsSchema from '../schema/conversation';
-import * as messagesSchema from '../schema/message';
-import * as toolsSchema from '../schema/tool';
-import * as toolExecutionsSchema from '../schema/tool_executions';
+import * as schema from '../schema';
 import { drizzle as drizzleSqlite } from 'drizzle-orm/bun-sqlite';
 import { Database } from 'bun:sqlite';
 
@@ -17,10 +13,6 @@ const client = createClient({
 export const db = drizzle(client, {
   schema: {
     ...schema,
-    ...conversationsSchema,
-    ...messagesSchema,
-    ...toolsSchema,
-    ...toolExecutionsSchema,
   },
 });
 
@@ -29,10 +21,6 @@ const sqliteDb = new Database('./agi.db');
 export const sqlite = drizzleSqlite(sqliteDb, {
   schema: {
     ...schema,
-    ...conversationsSchema,
-    ...messagesSchema,
-    ...toolsSchema,
-    ...toolExecutionsSchema,
   },
 });
 

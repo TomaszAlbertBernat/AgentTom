@@ -54,7 +54,7 @@ All endpoints return consistent error responses with appropriate HTTP status cod
   },
   servers: [
     {
-      url: 'http://localhost:8080',
+      url: process.env.APP_URL || 'http://localhost:3000',
       description: 'Development server'
     },
     {

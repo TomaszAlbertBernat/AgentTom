@@ -42,15 +42,15 @@ Development mode:
 bun run dev
 ```
 
-The server will start on `http://localhost:8080` by default.
+The server will start on `http://localhost:3000` by default (configurable via `PORT` or `APP_URL`).
 
 ## 🔐 Environment Variables
 
 Required environment variables (see `.env-example` for full list):
-- `PORT` - Server port (default: 8080)
 - `OPENAI_API_KEY` - OpenAI API key
-- `DATABASE_URL` - SQLite database URL
-- `JWT_SECRET` - Secret for JWT token generation
+- `JWT_SECRET` - Secret for JWT token generation (defaults to a dev value if not set)
+- `APP_URL` - Base URL for the app (default: `http://localhost:3000`)
+- `PORT` - Server port (default: 3000)
 - `CORS_ORIGIN` - Allowed CORS origins
 
 Service API Keys:
@@ -62,12 +62,12 @@ Service API Keys:
 - `SENTRY_DSN` - For error tracking
 - `LANGFUSE_API_KEY` - For AI monitoring
 
-## 🛡️ Security Features
+## 🛡️ Security & Auth
 
-- Rate limiting (25 requests per 60 seconds)
+- Rate limiting (configurable; disabled automatically if `REDIS_URL` is not set)
 - CORS protection with configurable origins
 - File size limits (50MB max)
-- Authentication middleware with JWT
+- Authentication middleware with JWT. In development, API-key checks are disabled by default (`DISABLE_API_KEY=true`) so you can authenticate with just a JWT. In production, provide an API key.
 - Error handling middleware with Sentry integration
 - Input validation using Zod
 - Secure password hashing

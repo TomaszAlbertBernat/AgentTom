@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import db from '../../database/db';
+import { db } from '../../database';
 import { apiKeys } from '../../schema/api-keys';
 import { eq, and, lt, gt } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';

@@ -10,6 +10,7 @@ import { prettyJSON } from 'hono/pretty-json';
 import { HTTPException } from 'hono/http-exception';
 import { swaggerUI } from '@hono/swagger-ui';
 import { openApiConfig } from './config/openapi.config';
+import { createLogger } from './services/common/logger.service';
 
 // Import middleware
 import { authMiddleware } from './middleware/auth';
@@ -23,9 +24,15 @@ import { agiRoutes } from './routes/agi';
 import { toolRoutes } from './routes/tools';
 import { users_router } from './routes/users';
 import linearRoutes from './routes/linear';
+import files from './routes/files';
+import memory from './routes/memory';
+import text from './routes/text';
+import web from './routes/web';
+import media from './routes/spotify';
 
 // Create Hono app
 const app = new Hono();
+const appLogger = createLogger('App');
 
 // Global middleware
 app.use('*', logger());
@@ -84,7 +91,7 @@ app.onError((err, c) => {
     }, err.status);
   }
 
-  console.error('Unhandled error:', err);
+  appLogger.error('Unhandled error', err as Error);
   return c.json({
     error: 'Internal Server Error',
     status: 500,
@@ -109,5 +116,10 @@ app.route('/api/agi', agiRoutes);
 app.route('/api/tools', toolRoutes);
 app.route('/api/users', users_router);
 app.route('/api/linear', linearRoutes);
+app.route('/api/files', files);
+app.route('/api/memory', memory);
+app.route('/api/text', text);
+app.route('/api/web', web);
+app.route('/api/spotify', media);
 
 export { app }; 

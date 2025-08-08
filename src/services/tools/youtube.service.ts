@@ -1,5 +1,7 @@
 import {z} from 'zod';
 import {LangfuseSpanClient} from 'langfuse';
+import { createLogger } from '../common/logger.service';
+const log = createLogger('Tools:YouTube');
 import {parse} from 'node-html-parser';
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36';
@@ -44,7 +46,7 @@ const parseTranscriptEndpoint = (html: string, lang_code: string): string | null
 
     return caption_track?.baseUrl || null;
   } catch (error) {
-    console.error(`Failed to parse transcript endpoint: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    log.error('Failed to parse transcript endpoint', error as Error);
     return null;
   }
 };

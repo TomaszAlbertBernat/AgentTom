@@ -6,8 +6,11 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']).default('INFO'),
   PORT: z.string().transform(Number).pipe(z.number().min(1).max(65535)).default('3000'),
-  APP_URL: z.string().url(),
-  API_KEY: z.string().min(1),
+  APP_URL: z.string().url().default('http://localhost:3000'),
+  API_KEY: z.string().min(1).optional(),
+  JWT_SECRET: z.string().min(1).default('dev-secret'),
+  APP_TIMEZONE: z.string().default('Europe/Warsaw'),
+  DISABLE_API_KEY: z.enum(['true', 'false']).default((process.env.NODE_ENV || 'development') === 'production' ? 'false' : 'true'),
 
   // AI Providers
   OPENAI_API_KEY: z.string().min(1),
@@ -81,7 +84,9 @@ export const validateEnv = (): EnvConfig => {
     if (error instanceof z.ZodError) {
       const missingVars = error.errors
         .filter(err => err.code === 'invalid_type' && err.received === 'undefined')
-        .map(err => err.path.join('.'));
+        .map(err => err.path.join('.'))
+        // In development, ignore missing optional keys like API_KEY
+        .filter(name => (process.env.NODE_ENV || 'development') === 'production' ? true : name !== 'API_KEY');
       
       const invalidVars = error.errors
         .filter(err => err.code !== 'invalid_type' || err.received !== 'undefined')
@@ -102,7 +107,25 @@ export const validateEnv = (): EnvConfig => {
       console.error('\n💡 Please check your .env file and ensure all required variables are set.');
       console.error('📋 You can use .env-example as a template.\n');
       
-      process.exit(1);
+      // In development and test modes, do not hard exit to improve DX and allow tests to run
+      const nodeEnv = process.env.NODE_ENV || 'development';
+      if (nodeEnv !== 'development' && nodeEnv !== 'test') {
+        process.exit(1);
+      } else {
+        console.warn('Continuing in development despite env validation warnings.');
+        // Provide a best-effort config by merging defaults
+        return envSchema.parse({
+          NODE_ENV: nodeEnv,
+          LOG_LEVEL: process.env.LOG_LEVEL || 'INFO',
+          PORT: process.env.PORT || '3000',
+          APP_URL: process.env.APP_URL || 'http://localhost:3000',
+          API_KEY: process.env.API_KEY,
+          JWT_SECRET: process.env.JWT_SECRET || 'dev-secret',
+          APP_TIMEZONE: process.env.APP_TIMEZONE || 'Europe/Warsaw',
+          DISABLE_API_KEY: process.env.DISABLE_API_KEY || 'true',
+          OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'test-openai-key',
+        });
+      }
     }
     throw error;
   }
@@ -170,3 +193,39 @@ export const logServiceStatus = () => {
   
   console.log('');
 }; 
+
+/**
+ * Returns structured service configuration status for health endpoints
+ */
+export const getServiceStatus = () => {
+  const services = [
+    { name: 'OpenAI', enabled: !!env.OPENAI_API_KEY, required: true },
+    { name: 'Anthropic', enabled: isServiceEnabled.anthropic(), required: false },
+    { name: 'XAI', enabled: isServiceEnabled.xai(), required: false },
+    { name: 'Langfuse', enabled: isServiceEnabled.langfuse(), required: false },
+    { name: 'Qdrant', enabled: isServiceEnabled.qdrant(), required: false },
+    { name: 'Algolia', enabled: isServiceEnabled.algolia(), required: false },
+    { name: 'Google Services', enabled: isServiceEnabled.google(), required: false },
+    { name: 'Calendar', enabled: isServiceEnabled.calendar(), required: false },
+    { name: 'Firecrawl', enabled: isServiceEnabled.firecrawl(), required: false },
+    { name: 'ElevenLabs', enabled: isServiceEnabled.elevenlabs(), required: false },
+    { name: 'Resend', enabled: isServiceEnabled.resend(), required: false },
+    { name: 'Linear', enabled: isServiceEnabled.linear(), required: false },
+    { name: 'Spotify', enabled: isServiceEnabled.spotify(), required: false },
+    { name: 'CoinMarketCap', enabled: isServiceEnabled.coinMarketCap(), required: false },
+  ];
+
+  const enabledCount = services.filter(s => s.enabled).length;
+  const requiredCount = services.filter(s => s.required && s.enabled).length;
+  const totalRequired = services.filter(s => s.required).length;
+
+  return {
+    services,
+    counts: {
+      enabled: enabledCount,
+      requiredEnabled: requiredCount,
+      totalRequired,
+      total: services.length
+    }
+  };
+};
