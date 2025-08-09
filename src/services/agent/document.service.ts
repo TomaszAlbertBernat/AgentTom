@@ -8,6 +8,7 @@ import {v4 as uuidv4} from 'uuid';
 import {createTextService} from '../common/text.service';
 import {eq} from 'drizzle-orm';
 import { createLogger } from '../common/logger.service';
+import { env } from '../../config/env.config';
 
 const DocumentMetadataSchema = z.object({
   uuid: z.string(),
@@ -59,7 +60,7 @@ interface CreateErrorDocumentParams {
   source_uuid?: string;
 }
 
-const text_service = await createTextService({model_name: 'gpt-4o'});
+const text_service = await createTextService({model_name: env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash'});
 
 export const documentService = {
   log: createLogger('DocumentService'),

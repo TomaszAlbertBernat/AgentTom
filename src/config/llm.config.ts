@@ -32,6 +32,22 @@ export const providers: Record<string, Record<string, ModelSpecs>> = {
       knowledgeCutoff: '2023-10'
     }
   },
+  google: {
+    // Gemini latest fast multimodal
+    'gemini-2.5-flash': {
+      id: 'gemini-2.5-flash',
+      contextWindow: 1_000_000,
+      maxOutput: 8_192,
+      knowledgeCutoff: '2024-07'
+    },
+    // NOTE: 'gemini-2.0-flash' is intentionally omitted from defaults; prefer 2.5.
+    'gemini-1.5-flash': {
+      id: 'gemini-1.5-flash',
+      contextWindow: 1_000_000,
+      maxOutput: 8_192,
+      knowledgeCutoff: '2024-07'
+    }
+  },
   anthropic: {
     'claude-3-5-sonnet-latest': {
       id: 'claude-3-5-sonnet-latest',

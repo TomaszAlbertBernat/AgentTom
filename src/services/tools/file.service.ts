@@ -26,6 +26,7 @@ import { db } from '../../database';
 import { documents } from '../../schema/document';
 import {youtubeService} from './youtube.service';
 import { CoreMessage } from 'ai';
+import { env } from '../../config/env.config';
 
 /**
  * Schema for validating file service actions and payloads
@@ -56,7 +57,7 @@ const filePayloadSchema = z.discriminatedUnion('action', [
 ]);
 
 /** Text service instance for tokenization and processing */
-const text_service = await createTextService({model_name: 'gpt-4o'});
+const text_service = await createTextService({model_name: env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash'});
 
 /**
  * Validates if a string is a valid HTTP/HTTPS URL

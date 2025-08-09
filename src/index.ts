@@ -1,4 +1,3 @@
-import { serve } from '@hono/node-server';
 import { app } from './app';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { sqlite } from './database';
@@ -41,32 +40,56 @@ const memoryCheckId = timerRegistry.setInterval(() => {
   memoryTracker.logDetailedMemoryUsage();
 }, MEMORY_CHECK_INTERVAL);
 
-// Set up graceful shutdown handling
-const server = serve({
-  fetch: app.fetch,
-  port: Number(port),
-});
+// Start HTTP server using Bun.serve when available to avoid Response interop issues
+const isBunRuntime = typeof (globalThis as any).Bun !== 'undefined' && typeof (globalThis as any).Bun.serve === 'function';
+
+let stopServer: (() => void) | null = null;
+
+if (isBunRuntime) {
+  const bunServer = (globalThis as any).Bun.serve({
+    fetch: app.fetch,
+    port: Number(port),
+  });
+  stopServer = () => bunServer.stop();
+} else {
+  // Dynamically import node server only when not running under Bun
+  (async () => {
+    const { serve } = await import('@hono/node-server');
+    const nodeServer = serve({
+      fetch: app.fetch,
+      port: Number(port),
+    });
+    stopServer = () => nodeServer.close();
+  })();
+}
 
 // Handle graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  
+const handleShutdown = async (signal: string) => {
+  logger.info(`${signal} received, shutting down gracefully`);
+
   // Log final memory usage
   memoryTracker.logDetailedMemoryUsage();
-  
+
   // Clear all timers
   timerRegistry.clearAll();
-  
+
   // Close server
-  server.close(() => {
+  try {
+    stopServer && stopServer();
     logger.info('HTTP server closed');
     process.exit(0);
-  });
-  
-  // Force exit after timeout
+  } catch (err) {
+    logger.error('Error during server shutdown');
+    process.exit(1);
+  }
+
+  // Force exit after timeout (safety)
   setTimeout(() => {
     logger.error('Forced shutdown after timeout');
     process.exit(1);
   }, 10000);
-});
+};
+
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));
 

@@ -25,7 +25,7 @@ const SPECIAL_TOKENS = new Map<string, number>([
  * @constant {z.ZodSchema}
  */
 const textServiceSchema = z.object({
-  model_name: z.string().default('gpt-4o')
+  model_name: z.string().default('gemini-2.5-flash')
 });
 
 /**
@@ -66,10 +66,22 @@ const countTokens = (tokenizer: TokenizerState['tokenizer'], text: string): numb
  * @param {string} [model] - Optional model name to use
  * @returns {Promise<TokenizerState>} Updated tokenizer state
  */
+/**
+ * Maps arbitrary provider model names to a tokenizer-supported model name.
+ * Tokenizers are provider-specific; for unsupported models (e.g., Gemini),
+ * we default to an OpenAI tokenizer that approximates token counts.
+ */
+const normalizeModelForTokenizer = (modelName: string): string => {
+  if (!modelName) return 'gpt-4o';
+  // If not an OpenAI GPT model, fall back to GPT tokenizer to avoid runtime errors
+  return modelName.startsWith('gpt') ? modelName : 'gpt-4o';
+};
+
 const initializeTokenizer = async (state: TokenizerState, model?: string): Promise<TokenizerState> => {
   if (!state.tokenizer || model !== state.model_name) {
     const model_name = model || state.model_name;
-    const tokenizer = await createByModelName(model_name, SPECIAL_TOKENS);
+    const tokenizerModel = normalizeModelForTokenizer(model_name);
+    const tokenizer = await createByModelName(tokenizerModel, SPECIAL_TOKENS);
     return {tokenizer, model_name};
   }
   return state;
@@ -227,7 +239,7 @@ const getChunk = (tokenizer: TokenizerState['tokenizer'], text: string, start: n
 /**
  * Creates a text service instance with tokenization and chunking capabilities
  * @param {z.infer<typeof textServiceSchema>} config - Configuration for the text service
- * @param {string} [config.model_name='gpt-4o'] - Name of the model to use for tokenization
+ * @param {string} [config.model_name='gemini-2.5-flash'] - Name of the model to use for tokenization
  * @returns {Promise<{split: Function, countTokens: Function}>} Text service with split and countTokens methods
  */
 export const createTextService = async (config: z.infer<typeof textServiceSchema>) => {
@@ -303,10 +315,10 @@ export const createTextService = async (config: z.infer<typeof textServiceSchema
 
 /**
  * Creates a standalone tokenizer instance for token counting and text formatting
- * @param {string} [model_name='gpt-4o'] - Name of the model to use for tokenization
+ * @param {string} [model_name='gemini-2.5-flash'] - Name of the model to use for tokenization
  * @returns {Promise<{countTokens: Function, formatForTokenization: Function}>} Tokenizer with utility methods
  */
-export const createTokenizer = async (model_name: string = 'gpt-4o') => {
+export const createTokenizer = async (model_name: string = 'gemini-2.5-flash') => {
   const state: TokenizerState = {
     tokenizer: undefined,
     model_name

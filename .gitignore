@@ -9,6 +9,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env-example
 *.pem
 *.key
 *.cert
@@ -44,6 +45,12 @@ lerna-debug.log*
 *.sqlite3
 *.db
 agi.db
+# SQLite journaling files
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite-wal
+*.sqlite-shm
 
 # Build and distribution
 dist/
@@ -56,6 +63,7 @@ coverage/
 
 # Storage and temporary files
 storage/
+src/**/storage/
 tmp/
 temp/
 *.tmp
@@ -67,8 +75,6 @@ docs/_build/
 site/
 
 # Testing
-coverage/
-.nyc_output/
 .nyc_output/
 
 # Misc
@@ -76,3 +82,5 @@ coverage/
 .cursorrules
 .cursorignore
 TODO.md
+*.tsbuildinfo
+.eslintcache

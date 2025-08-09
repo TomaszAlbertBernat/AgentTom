@@ -2,6 +2,7 @@
 import {embed, generateText, generateObject, streamText} from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
+import { google } from '@ai-sdk/google';
 import OpenAI, { toFile } from 'openai';
 import {type CompletionConfig} from '../../types/llm';
 import type {CoreMessage} from 'ai';
@@ -17,7 +18,8 @@ import {providers} from '../../config/llm.config';
  * @returns Base configuration with resolved provider and validated parameters
  * @throws {Error} When model is not found in configuration
  */
-const createBaseConfig = ({model = 'gpt-4o', messages, temperature = 0.7, max_tokens = 16384, user}: CompletionConfig) => {
+// NOTE: Do not use 'gemini-2.0-flash'. Default to 'gemini-2.5-flash'.
+const createBaseConfig = ({model = 'gemini-2.5-flash', messages, temperature = 0.7, max_tokens = 16384, user}: CompletionConfig) => {
   const provider = Object.entries(providers).find(([_, models]) => 
     Object.keys(models).includes(model)
   )?.[0] ?? 'openai';
@@ -30,9 +32,17 @@ const createBaseConfig = ({model = 'gpt-4o', messages, temperature = 0.7, max_to
   // Return the actual LanguageModelV1 object based on provider
   let languageModel;
   if (provider === 'openai') {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not set. Provide a valid key or choose a model from a configured provider.');
+    }
     languageModel = openai(model);
   } else if (provider === 'anthropic') {
     languageModel = anthropic(model);
+  } else if (provider === 'google') {
+    if (!process.env.GOOGLE_API_KEY) {
+      throw new Error('GOOGLE_API_KEY is not set. Provide a valid key or choose a different model.');
+    }
+    languageModel = google(model);
   } else {
     throw new Error(`Unsupported provider: ${provider}`);
   }
@@ -86,7 +96,7 @@ export const completion = {
    * Generates text completion using the specified model
    * 
    * @param config - The completion configuration
-   * @param config.model - The model to use (default: 'gpt-4o')
+   * @param config.model - The model to use (default: 'gemini-2.5-flash')
    * @param config.messages - Array of conversation messages
    * @param config.temperature - Randomness level (0-1, default: 0.7)
    * @param config.max_tokens - Maximum tokens to generate (default: 16384)
@@ -121,7 +131,8 @@ export const completion = {
         maxTokens: max_tokens
       });
 
-      return openAIFormat ? generateResponseBody(result.text, config.model || 'gpt-4o', result.usage) : result.text;
+      // NOTE: Never use 'gemini-2.0-flash'. Prefer 'gemini-2.5-flash'.
+      return openAIFormat ? generateResponseBody(result.text, config.model || 'gemini-2.5-flash', result.usage) : result.text;
     } catch (error) {
       throw new Error(`Text completion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -132,7 +143,7 @@ export const completion = {
    * Returns an async iterable stream of text chunks
    * 
    * @param config - The completion configuration
-   * @param config.model - The model to use (default: 'gpt-4o')
+   * @param config.model - The model to use (default: 'gemini-2.5-flash')
    * @param config.messages - Array of conversation messages
    * @param config.temperature - Randomness level (0-1, default: 0.7)
    * @param config.max_tokens - Maximum tokens to generate (default: 16384)
@@ -161,12 +172,13 @@ export const completion = {
   stream: async ({max_tokens = 16384, ...config}: CompletionConfig) => {
     try {
       const provider = Object.entries(providers).find(([_, models]) => 
-        Object.keys(models).includes(config.model || 'gpt-4o')
+        // NOTE: Never use 'gemini-2.0-flash'.
+        Object.keys(models).includes(config.model || 'gemini-2.5-flash')
       )?.[0] ?? 'openai';
 
       const {textStream} = streamText({
         ...createBaseConfig(config),
-        maxTokens: Math.min(max_tokens, providers[provider][config.model || 'gpt-4o'].maxOutput)
+        maxTokens: Math.min(max_tokens, providers[provider][config.model || 'gemini-2.5-flash'].maxOutput)
       });
       return textStream;
     } catch (error) {
@@ -210,13 +222,13 @@ export const completion = {
   object: async <T = unknown>(config: CompletionConfig): Promise<T> => {
     try {
       const provider = Object.entries(providers).find(([_, models]) => 
-        Object.keys(models).includes(config.model || 'gpt-4o')
+        Object.keys(models).includes(config.model || 'gemini-2.5-flash')
       )?.[0] ?? 'openai';
 
       if (provider === 'anthropic') {
         const result = await completion.text({
           ...config,
-          max_tokens: providers[provider][config.model || 'gpt-4o'].maxOutput
+          max_tokens: providers[provider][config.model || 'gemini-2.5-flash'].maxOutput
         });
         return JSON.parse(result as string) as T;
       }
@@ -254,7 +266,7 @@ export const completion = {
  */
 export const embedding = async (text: string) => {
   const {embedding} = await embed({
-    model: openai.embedding('text-embedding-3-large'),
+    model: google.embedding('text-embedding-004'),
     value: text
   });
 
@@ -361,9 +373,15 @@ interface TranscriptionResult {
   file_path?: string;
 }
 
-const openai_client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+let openai_client_instance: OpenAI | null = null;
+function getOpenAIClient(): OpenAI {
+  if (!openai_client_instance) {
+    openai_client_instance = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
+  }
+  return openai_client_instance;
+}
 
 /**
  * Audio Transcription Service
@@ -423,7 +441,7 @@ export const transcription = {
     try {
       const file = await toFile(audio_buffer, 'audio.ogg');
       
-      const result = await openai_client.audio.transcriptions.create({
+      const result = await getOpenAIClient().audio.transcriptions.create({
         file,
         model: config.model || 'whisper-1',
         language: config.language,

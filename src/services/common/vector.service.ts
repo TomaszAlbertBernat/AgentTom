@@ -64,8 +64,8 @@ const qdrant = new QdrantClient({
 /** The name of the Qdrant collection used for vector storage */
 const COLLECTION_NAME = process.env.QDRANT_INDEX || 'alice';
 
-/** The dimensionality of vectors stored in the collection (OpenAI ada-002 embedding size) */
-const VECTOR_SIZE = 3072;
+/** The dimensionality of vectors stored in the collection (Gemini text-embedding-004 size) */
+const VECTOR_SIZE = 768;
 
 /**
  * Formats search filters into Qdrant-compatible filter structure

@@ -38,10 +38,10 @@ describe('Vector Service', () => {
 
   describe('Vector operations', () => {
     test('should handle search with embedding vector', async () => {
-      // Create mock embedding (1536 dimensions like OpenAI)
-      const mockEmbedding = Array.from({ length: 1536 }, () => Math.random() - 0.5);
+      // Create mock embedding (768 dimensions like Gemini text-embedding-004)
+      const mockEmbedding = Array.from({ length: 768 }, () => Math.random() - 0.5);
       
-      expect(mockEmbedding).toHaveLength(1536);
+      expect(mockEmbedding).toHaveLength(768);
       expect(mockEmbedding.every(val => typeof val === 'number')).toBe(true);
       expect(mockEmbedding.some(val => val >= -0.5 && val <= 0.5)).toBe(true);
     });
@@ -94,7 +94,7 @@ describe('Vector Service', () => {
       const mockPoints = [
         {
           id: 'test-point-1',
-          vector: Array.from({ length: 1536 }, () => Math.random() - 0.5),
+          vector: Array.from({ length: 768 }, () => Math.random() - 0.5),
           payload: {
             document_uuid: 'doc-uuid-1',
             content_type: 'chunk',
@@ -106,7 +106,7 @@ describe('Vector Service', () => {
       ];
 
       expect(mockPoints).toHaveLength(1);
-      expect(mockPoints[0].vector).toHaveLength(1536);
+      expect(mockPoints[0].vector).toHaveLength(768);
       expect(mockPoints[0].payload.document_uuid).toBe('doc-uuid-1');
       expect(mockPoints[0].payload.text).toBe('Test content');
     });
@@ -115,7 +115,7 @@ describe('Vector Service', () => {
       const batchSize = 100;
       const mockBatchPoints = Array.from({ length: batchSize }, (_, i) => ({
         id: `batch-point-${i}`,
-        vector: Array.from({ length: 1536 }, () => Math.random() - 0.5),
+        vector: Array.from({ length: 768 }, () => Math.random() - 0.5),
         payload: {
           document_uuid: `doc-uuid-${i}`,
           content_type: 'chunk' as const,
@@ -125,7 +125,7 @@ describe('Vector Service', () => {
       }));
 
       expect(mockBatchPoints).toHaveLength(batchSize);
-      expect(mockBatchPoints.every(p => p.vector.length === 1536)).toBe(true);
+      expect(mockBatchPoints.every(p => p.vector.length === 768)).toBe(true);
       expect(mockBatchPoints[0].id).toBe('batch-point-0');
       expect(mockBatchPoints[99].id).toBe('batch-point-99');
     });
@@ -163,7 +163,7 @@ describe('Vector Service', () => {
       const invalidVector = [1, 2, 3]; // Too few dimensions
       
       expect(invalidVector).toHaveLength(3);
-      expect(invalidVector.length).toBeLessThan(1536);
+      expect(invalidVector.length).toBeLessThan(768);
     });
 
     test('should handle malformed payloads', async () => {

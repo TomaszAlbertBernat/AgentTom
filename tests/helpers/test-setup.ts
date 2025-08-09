@@ -183,7 +183,7 @@ export const waitFor = (ms: number) => new Promise(resolve => setTimeout(resolve
 /**
  * Utility to create mock embedding vectors
  */
-export const createMockEmbedding = (dimension = 1536): number[] => {
+export const createMockEmbedding = (dimension = 768): number[] => {
   return Array.from({ length: dimension }, () => Math.random() - 0.5);
 };
 

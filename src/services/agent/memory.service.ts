@@ -515,7 +515,8 @@ export const memoryService = {
     const state = stateManager.getState();
     
     const queries = await completion.object<MemoryQuery>({
-      model: state.config.model ?? 'gpt-4o',
+      // NOTE: Never use 'gemini-2.0-flash'.
+      model: state.config.model ?? 'gemini-2.5-flash',
       messages: [
         {role: 'system', content: memoryRecallPrompt()},
         {role: 'user', content: query}

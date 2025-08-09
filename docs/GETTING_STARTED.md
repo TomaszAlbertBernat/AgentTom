@@ -47,7 +47,9 @@ The server will start on `http://localhost:3000` by default (configurable via `P
 ## 🔐 Environment Variables
 
 Required environment variables (see `.env-example` for full list):
-- `OPENAI_API_KEY` - OpenAI API key
+- At least one LLM provider key (Gemini is default):
+  - `GOOGLE_API_KEY` — default provider
+  - `OPENAI_API_KEY` — optional fallback
 - `JWT_SECRET` - Secret for JWT token generation (defaults to a dev value if not set)
 - `APP_URL` - Base URL for the app (default: `http://localhost:3000`)
 - `PORT` - Server port (default: 3000)
@@ -61,6 +63,11 @@ Service API Keys:
 - `ALGOLIA_APP_ID` & `ALGOLIA_API_KEY` - For search functionality
 - `SENTRY_DSN` - For error tracking
 - `LANGFUSE_API_KEY` - For AI monitoring
+
+LLM configuration (optional overrides):
+- `DEFAULT_LLM_PROVIDER=google`
+- `DEFAULT_TEXT_MODEL=gemini-2.5-flash` (do not use `gemini-2.0-flash`)
+- `FALLBACK_TEXT_MODEL=gpt-4o-mini`
 
 ## 🛡️ Security & Auth
 

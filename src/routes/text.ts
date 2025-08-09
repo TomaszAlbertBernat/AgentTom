@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { createTextService } from '../services/common/text.service';
+import { env } from '../config/env.config';
 import type { AppEnv } from '../types/hono';
 
 const text = new Hono<AppEnv>();
@@ -21,7 +22,7 @@ text.post('/split', zValidator('json', splitTextSchema), async (c) => {
   try {
     const { text: input_text, chunk_size, metadata } = c.req.valid('json');
     
-    const text_service = await createTextService({ model_name: 'gpt-4o' });
+    const text_service = await createTextService({ model_name: env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash' });
     const chunks = await text_service.split(input_text, chunk_size, metadata);
     
     return c.json({ chunks });

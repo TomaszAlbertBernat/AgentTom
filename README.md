@@ -12,7 +12,7 @@ bun install
 
 2) Configure environment
 
-- Copy `.env-example` to `.env` and fill required values (at minimum set `APP_URL` and `OPENAI_API_KEY`). In development, `API_KEY` can be disabled.
+ - Copy `.env-example` to `.env` and fill required values (at minimum set `APP_URL` and at least one LLM key: `GOOGLE_API_KEY` or `OPENAI_API_KEY`). In development, `API_KEY` can be disabled.
 - Default port is 3000 (override with `PORT`).
 
 3) Initialize database
@@ -37,7 +37,8 @@ bun run dev
 
 Key variables (see `.env-example` for the complete list):
 
-- Core: `APP_URL`, `PORT`, `OPENAI_API_KEY`
+- Core: `APP_URL`, `PORT`
+- LLM: `GOOGLE_API_KEY` (default), `OPENAI_API_KEY` (fallback), `DEFAULT_LLM_PROVIDER`, `DEFAULT_TEXT_MODEL`, `FALLBACK_TEXT_MODEL`
 - Optional providers: `ANTHROPIC_API_KEY`, `XAI_API_KEY`
 - Langfuse: `LANGFUSE_SECRET_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_BASEURL`
 - Search: `ALGOLIA_APP_ID`, `ALGOLIA_API_KEY`, `ALGOLIA_INDEX`
@@ -57,6 +58,7 @@ Key variables (see `.env-example` for the complete list):
 Notes:
 - The previous `ALGOLIA_INDEX_NAME` has been standardized to `ALGOLIA_INDEX`.
 - The seed file uses `API_KEY` only to create a demo user token; global API auth uses a different mechanism (see below).
+- LLM defaults: Gemini as default provider with automatic OpenAI fallback on rate limits; configurable via env.
 
 ## Authentication
 

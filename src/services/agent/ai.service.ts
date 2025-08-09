@@ -289,12 +289,14 @@ export const aiService = {
     const task_generation = span.generation({
       name: 'task_planning',
       input: taskMessages,
-      model: 'gpt-4o'
+      // NOTE: Never use 'gemini-2.0-flash'.
+      model: 'gemini-2.5-flash'
     });
 
     const taskPlanning = await completion.object<AgentThoughts['task']>({
       messages: taskMessages,
-      model: 'gpt-4o',
+      // NOTE: Never use 'gemini-2.0-flash'.
+      model: 'gemini-2.5-flash',
       temperature: 0,
       user: {
         uuid: state.config.user_uuid || '',

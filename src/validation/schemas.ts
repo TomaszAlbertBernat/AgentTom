@@ -440,8 +440,9 @@ export const EnvironmentSchema = z.object({
   API_KEY: z.string().min(1, 'API key is required'),
   JWT_SECRET: z.string().min(32, 'JWT secret must be at least 32 characters'),
   
-  // AI Providers
-  OPENAI_API_KEY: z.string().min(1, 'OpenAI API key is required'),
+  // AI Providers (provide at least one; Gemini is default)
+  OPENAI_API_KEY: z.string().optional(),
+  GOOGLE_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   XAI_API_KEY: z.string().optional(),
   

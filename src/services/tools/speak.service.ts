@@ -10,6 +10,7 @@ import {documentService} from '../agent/document.service';
 import type {DocumentType} from '../agent/document.service';
 import {createTextService} from '../common/text.service';
 import {elevenlabsService} from '../common/elevenlabs.service';
+import { env } from '../../config/env.config';
 
 const exec = promisify(execCallback);
 
@@ -19,7 +20,7 @@ const speakPayloadSchema = z.object({
   mode: z.enum(['speak', 'elevenlabs']).default('elevenlabs')
 });
 
-const text_service = await createTextService({model_name: 'gpt-4o'});
+const text_service = await createTextService({model_name: env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash'});
 
 const playAudioBuffer = async (buffer: Buffer, span?: LangfuseSpanClient): Promise<void> => {
   const temp_file = join(tmpdir(), `speech-${Date.now()}.mp3`);

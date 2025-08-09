@@ -155,14 +155,17 @@ const imageService = {
 
           const image_base64 = await downloadImageAsBase64(image_url);
 
+          // NOTE: Never use 'gemini-2.0-flash'. Using 'gemini-2.5-flash'.
           const analysis_result = await completion.text({
-            model: 'gpt-4-vision-preview',
+            model: 'gemini-2.5-flash',
             messages: [
               {
                 role: 'user',
+                // Vercel AI SDK supports array content parts with Google provider as well
+                // Use image as data URL part
                 content: [
                   { type: 'text', text: analysis_prompt },
-                  { type: 'image_url', image_url: image_base64 } as any
+                  { type: 'image', image: image_base64 } as any
                 ]
               }
             ],

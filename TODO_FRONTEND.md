@@ -17,7 +17,7 @@ Constraints validated against backend:
 - AGI supports creating conversations, sending messages, and fetching messages for a conversation, but lacks a list endpoint.
 - Tools and Files endpoints match current backend.
 - Web search/content and health endpoints exist.
-- OpenAPI spec is served at `/docs/openapi.json` but currently lacks `paths` definitions (types codegen is blocked until fixed).
+- OpenAPI spec is served at `/docs/openapi.json` and now includes minimal `paths` to unblock codegen (expand later with real schemas).
 
 ### Recommended Tech Stack (aligned with Tech_stack.md)
 - Runtime/Package manager: Bun (same as backend)
@@ -51,7 +51,7 @@ Rationale
 
 Backend gaps that affect architecture
 - OpenAPI spec has no `paths` section; must be generated (via `@hono/zod-openapi` or manual) for end-to-end typing.
-- Production auth currently cannot carry API key and JWT simultaneously (details below). Until fixed, proxy-only architecture is required and frontends should run in dev-mode auth.
+- Production auth previously could not carry API key and JWT simultaneously. This is now addressed by accepting `X-API-Key` and supporting JWT via `Authorization` or `X-JWT`.
 
 ### API Mapping (backend → frontend features)
 - Auth
@@ -62,8 +62,7 @@ Backend gaps that affect architecture
   - POST `/api/agi/conversations`
   - POST `/api/agi/messages`
   - GET `/api/agi/conversations/:id/messages`
-  - Missing: `GET /api/agi/conversations` (list). Required for chat sidebar/history.
-  - Note: There exists an unused `src/routes/conversation.ts` with list/read/create semantics but it's not mounted in `src/app.ts`. Either mount as `/api/conversations` or fold into `/api/agi` with a proper `GET /api/agi/conversations`.
+- Missing: `GET /api/agi/conversations` (list). For now, `src/routes/conversation.ts` is mounted under `/api/conversations` providing list/read/create.
 - Tools
   - GET `/api/tools`
   - POST `/api/tools/execute`
@@ -94,12 +93,9 @@ Backend gaps that affect architecture
   - Execute web search and show results; link out to content, display `get-contents` results.
 
 ### Auth Considerations
-- Dev (current): `DISABLE_API_KEY=true` (default in non-production) → backend accepts `Authorization: Bearer <jwt>` and sets `request.user`.
-- Prod (current): backend expects `Authorization: Bearer <api_key>` (global middleware), while AGI routes also apply a per-route JWT check that expects `Authorization: Bearer <jwt>`. This conflicts; AGI cannot function in production as-is.
-- Required backend changes before prod:
-  1) Accept API keys via `X-API-Key: <api_key>` everywhere, keep `Authorization: Bearer <jwt>` exclusively for JWT where needed (e.g., AGI). Update `authMiddleware` accordingly.
-  2) Remove route-level `jwtMiddleware` from AGI and instead consume `request.user` set by the global middleware. Optionally support `X-JWT: <jwt>` to override/impersonate for AGI where an API key is used server-to-server.
-  3) Document precedence/resolution when both API key and JWT are present.
+- Dev (current): `DISABLE_API_KEY=true` (default in non-production) → backend accepts `Authorization: Bearer <jwt>` or `X-JWT` and sets `request.user`.
+- Prod (updated): backend accepts `X-API-Key: <api_key>` and AGI consumes `request.user` from the global middleware; JWT may be provided via `Authorization: Bearer <jwt>` or `X-JWT` by the proxy.
+- Precedence: in production API-key mode, API key authorizes access; user context comes from JWT when provided.
 - Proxy details:
   - Store JWT in HttpOnly, Secure, SameSite=Strict cookies scoped to the frontend domain.
   - Next Route Handlers read cookies and attach `Authorization: Bearer <jwt>` and `X-API-Key` as required.
@@ -110,7 +106,7 @@ Backend gaps that affect architecture
 - Tooling options:
   - `openapi-typescript` → type declarations + `openapi-fetch` client
   - or `orval` → generates typed hooks for React Query
-- Blocker: The current OpenAPI spec exports components/tags but no `paths`. Add `paths` (ideally generated via `@hono/zod-openapi` from route schemas) before enabling codegen.
+- Paths are present (minimal). Next task: generate routes with `@hono/zod-openapi` to strengthen schemas and responses.
 - Codegen script example (once `paths` exist):
   - `bunx openapi-typescript http://localhost:3000/docs/openapi.json -o frontend/src/lib/api/types.d.ts`
   - Optional: generate a small typed client using `openapi-fetch` with `paths` from the generated types.
@@ -179,13 +175,13 @@ frontend/
   - `NEXT_PUBLIC_APP_URL=http://localhost:3001` (if running frontend on 3001)
 - Start dev: `bun run dev` (from `frontend/`)
 - Configure Next rewrites to `http://localhost:3000` for static GET endpoints; use proxy route handlers for authenticated POSTs.
- - Until OpenAPI `paths` are added, skip codegen; use hand-written API clients with Zod validation in the proxy as a temporary measure.
+ - Minimal OpenAPI `paths` unblocks codegen. Prefer moving to generated `paths` with `@hono/zod-openapi` soon.
 
 ### Deployment (outline)
 - Option A: Vercel for frontend, backend hosted separately (Fly, Render, Docker on VPS). Lock down backend CORS to frontend domain.
 - Option B: Self-host both behind an Nginx reverse proxy; share domain with path-based routing `/api` (backend) and `/` (frontend).
 - Configure environment: API base URL, cookie domain, secure flags.
-- Ensure backend supports `X-API-Key` (or equivalent) before exposing frontend publicly.
+ - Backend supports `X-API-Key`. Ensure frontend proxy attaches `X-API-Key` and `Authorization: Bearer <jwt>`/`X-JWT` appropriately.
  - Harden CORS to an allowlist; avoid `*` with `credentials: true` in production.
 
 ### Testing
@@ -195,7 +191,7 @@ frontend/
  - Add a smoke test for rate-limit headers and CORS preflight behavior to ensure proxy routes don’t regress.
 
 ### Future Enhancements
-- Streaming chat (SSE/WebSocket) once backend exposes a streaming endpoint. There is no `/api/agi/chat` or `/api/agi/chat/stream` route implemented today (cron service references `/api/agi/chat`, which is missing). Align backend first and reuse the existing `streamResponse` utility in `src/utils/response.ts`.
+- Streaming chat (SSE/WebSocket) once backend exposes a streaming endpoint. There is no `/api/agi/chat` or `/api/agi/chat/stream` route yet (cron service references `/api/agi/chat`, which is missing). Implement server endpoint using `streamResponse` when ready.
 - Tool form auto-generation from backend schemas (`src/config/tool-schemas.ts`) exposed via a new read-only endpoint.
 - OAuth flows (Google/Spotify/Linear) once keys are configured; integrate corresponding UI buttons.
 - Internationalization with next-intl.
@@ -208,11 +204,11 @@ frontend/
 - Add CORS allowlist for the production frontend domain.
 - Add `GET /api/agi/conversations` (list) and optionally `DELETE /api/agi/conversations/:id`.
 - Standardize error response shape across routes (align to OpenAPI `Error` and include `code`, `type` where applicable) to simplify client.
- - Generate OpenAPI `paths` via `@hono/zod-openapi` or curated spec to unblock typed client codegen.
+ - Expand OpenAPI `paths` via `@hono/zod-openapi` to replace minimal placeholders.
 
 ### Task Checklist
 - [ ] Initialize `frontend/` with Next.js, TS, Tailwind, shadcn/ui
-- [ ] Add OpenAPI codegen script and typed client; enforce in CI (blocked until `paths` are added)
+- [ ] Add OpenAPI codegen script and typed client; enforce in CI (partially unblocked; schemas still minimal)
 - [ ] Implement server-side proxy route handlers for auth-protected calls
 - [ ] Auth pages and cookie-based session management + CSRF for proxy POSTs
 - [ ] Dashboard with health summary from `/api/web/health/details` and `/api/tools/executions`
@@ -223,9 +219,10 @@ frontend/
 - [ ] Route protection (middleware) and error boundaries
 - [ ] E2E baseline with Playwright + MSW for component tests
 - [ ] CI step for type generation and lint/tests
- - [ ] Backend: add `X-API-Key` support and remove AGI route-level JWT dependency
- - [ ] Backend: add/mount conversations list endpoint (`GET /api/agi/conversations`)
- - [ ] Backend: add OpenAPI `paths` for all mounted routes
+ - [x] Backend: add `X-API-Key` support
+ - [x] Backend: remove AGI route-level JWT dependency (AGI now uses global `request.user`)
+ - [x] Backend: mount conversations list endpoint (`/api/conversations`)
+ - [x] Backend: add minimal OpenAPI `paths` for mounted routes
  - [ ] Backend: implement `/api/agi/chat` (and `/stream`) or remove cron references
 
 

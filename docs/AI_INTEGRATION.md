@@ -2,6 +2,79 @@
 
 This document describes the AI integration features and configuration in AliceAGI.
 
+## Google Gemini (default) with OpenAI fallback
+
+We use Google Gemini (AI Studio) as the default LLM provider with automatic fallback to OpenAI when Google returns rate-limit/quota errors. The integration is implemented via the Vercel AI SDK to keep a consistent API across providers.
+
+### Setup
+- Add environment variables (see `.env-example`):
+  - `GOOGLE_API_KEY` — API key from Google AI Studio
+  - `OPENAI_API_KEY` — used as fallback
+  - `DEFAULT_LLM_PROVIDER=google`
+  - `DEFAULT_TEXT_MODEL=gemini-2.5-flash`
+  - `FALLBACK_TEXT_MODEL=gpt-4o-mini`
+
+- Install providers if not present:
+  ```bash
+  bun add ai @ai-sdk/google @ai-sdk/openai
+  ```
+
+### Usage pattern (Vercel AI SDK)
+Centralized in `src/services/common/llm.service.ts`. Example shape shown here for reference:
+
+```ts
+import { generateText } from 'ai';
+import { google } from '@ai-sdk/google';
+import { openai } from '@ai-sdk/openai';
+
+// Try Google first, fallback to OpenAI on HTTP 429/quota
+async function generateWithFallback(prompt: string) {
+  try {
+    const { text } = await generateText({ model: google('gemini-2.5-flash'), prompt });
+    return text;
+  } catch (err: any) {
+    const status = err?.status || err?.response?.status;
+    if (status === 429) {
+      const { text } = await generateText({ model: openai('gpt-4o-mini'), prompt });
+      return text;
+    }
+    throw err;
+  }
+}
+```
+
+### Embeddings
+- Default: Gemini `text-embedding-004` when available
+- Fallback: OpenAI `text-embedding-3-large`
+
+### Multimodal (vision)
+- Default: Gemini multimodal (e.g., `gemini-1.5-flash`)
+- Current image generation remains with DALL·E; Imagen 3 via Vertex AI Images API is a future option
+
+### Streaming
+- Streaming uses the Vercel AI SDK `streamText`. If initial stream creation fails with 429, we retry with the fallback model.
+
+### Rate limits & quotas
+- Detect rate limits via HTTP 429 and provider-specific messages like “quota” or “resource exhausted”. On detection, we switch to the fallback model and can apply short TTL backoff.
+
+### References
+- Google Gemini API
+  - [Overview and docs](https://ai.google.dev/gemini-api/docs)
+  - [Node quickstart](https://ai.google.dev/gemini-api/docs/get-started/node)
+  - [Embeddings guide](https://ai.google.dev/gemini-api/docs/embeddings)
+  - [Multimodal / vision](https://ai.google.dev/gemini-api/docs/vision)
+  - [Rate limits and quotas](https://ai.google.dev/gemini-api/docs/quotas)
+- Vercel AI SDK
+  - [Google provider](https://sdk.vercel.ai/providers/google)
+  - [Introduction](https://sdk.vercel.ai/docs/introduction)
+- OpenAI
+  - [Rate limits](https://platform.openai.com/docs/guides/rate-limits)
+  - [Embeddings: text-embedding-3](https://platform.openai.com/docs/guides/embeddings)
+- Image generation (future option)
+  - [Vertex AI Images API (Imagen 3)](https://cloud.google.com/vertex-ai/generative-ai/docs/image)
+- Speech-to-Text (replacement options for Whisper)
+  - [Google Cloud Speech-to-Text v2](https://cloud.google.com/speech-to-text/v2/docs)
+
 ## 🤖 OpenAI Integration
 
 ### Configuration

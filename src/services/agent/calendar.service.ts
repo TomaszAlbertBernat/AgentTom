@@ -7,12 +7,13 @@ import {documentService} from './document.service';
 import {stateManager} from './state.service';
 import type {DocumentType} from './document.service';
 import {createTextService} from '../common/text.service';
+import { env } from '../../config/env.config';
 import { createLogger } from '../common/logger.service';
 
 const log = createLogger('Agent:Calendar');
 
 // Initialize text service
-const text_service = await createTextService({model_name: 'gpt-4o'});
+const text_service = await createTextService({model_name: env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash'});
 
 interface CalendarCredentials {
   client_id: string;

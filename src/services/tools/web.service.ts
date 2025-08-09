@@ -21,6 +21,7 @@ import {prompt as pickResourcesPrompt} from '../../prompts/tools/search.pick';
 import {completion} from '../common/llm.service';
 import {stateManager} from '../agent/state.service';
 import {createTextService} from '../common/text.service';
+import { env } from '../../config/env.config';
 import { createLogger } from '../common/logger.service';
 
 /**
@@ -230,7 +231,7 @@ const webService = {
       const { query } = searchPayloadSchema.parse(payload);
       const state = stateManager.getState();
       const conversation_uuid = state.config.conversation_uuid ?? 'unknown';
-      const text_service = await createTextService({model_name: 'gpt-4o'});
+      const text_service = await createTextService({model_name: env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash'});
 
       span?.event({
         name: 'web_search_start',
@@ -240,7 +241,8 @@ const webService = {
       // 1. Check if search is needed
       const searchNecessity = await completion.object<{shouldSearch: boolean, _thoughts: string}>({
         messages: [{role: 'system', content: useSearchPrompt()}, {role: 'user', content: query}],
-        model: state.config.model ?? 'gpt-4o',
+        // NOTE: Never use 'gemini-2.0-flash'.
+        model: state.config.model ?? 'gemini-2.5-flash',
         temperature: 0,
         user: {
           uuid: state.config.user_uuid ?? '',
@@ -271,7 +273,8 @@ const webService = {
       // 2. Generate queries
       const queryGeneration = await completion.object<{queries: Array<{q: string, url: string}>, _thoughts: string}>({
         messages: [{role: 'system', content: askSearchPrompt(whitelistedDomains)}, {role: 'user', content: query}],
-        model: state.config.model ?? 'gpt-4o',
+        // NOTE: Never use 'gemini-2.0-flash'.
+        model: state.config.model ?? 'gemini-2.5-flash',
         temperature: 0,
         user: {
           uuid: state.config.user_uuid ?? '',

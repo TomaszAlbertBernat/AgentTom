@@ -79,7 +79,7 @@ const files = new Hono<AppEnv>().post('/upload', async c => {
       return c.json({success: false, error: 'File not found'}, 404);
     }
 
-    return new Response(file.buffer, {
+    return c.newResponse(file.buffer, {
       headers: {
         'Content-Type': file.mime_type,
         'Content-Disposition': `inline; filename="${file.original_name}"`

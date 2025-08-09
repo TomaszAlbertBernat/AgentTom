@@ -22,7 +22,7 @@ Welcome to the AliceAGI documentation. This documentation provides comprehensive
    - Conversation
 
 4. [AI Integration](./AI_INTEGRATION.md)
-   - OpenAI Configuration
+   - Google Gemini (default) and OpenAI fallback
    - Prompt Management
    - Vector Search
 

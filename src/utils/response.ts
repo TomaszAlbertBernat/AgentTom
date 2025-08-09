@@ -14,7 +14,8 @@ interface StreamMetadata {
   conversation_id: string;
 }
 
-export const streamResponse = async (c: Context, result: ReadableStream<string>, metadata: StreamMetadata, model: string = 'gpt-4o') => {
+// NOTE: Never use 'gemini-2.0-flash'. Default stream model set to 'gemini-2.5-flash'.
+export const streamResponse = async (c: Context, result: ReadableStream<string>, metadata: StreamMetadata, model: string = 'gemini-2.5-flash') => {
   c.header('Content-Type', 'text/event-stream');
   c.header('Cache-Control', 'no-cache');
   c.header('Connection', 'keep-alive');

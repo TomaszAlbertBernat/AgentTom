@@ -13,9 +13,15 @@ const envSchema = z.object({
   DISABLE_API_KEY: z.enum(['true', 'false']).default((process.env.NODE_ENV || 'development') === 'production' ? 'false' : 'true'),
 
   // AI Providers
-  OPENAI_API_KEY: z.string().min(1),
+  OPENAI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   XAI_API_KEY: z.string().optional(),
+  GOOGLE_API_KEY: z.string().optional(),
+
+  // LLM defaults (optional overrides)
+  DEFAULT_LLM_PROVIDER: z.string().optional(),
+  DEFAULT_TEXT_MODEL: z.string().optional(),
+  FALLBACK_TEXT_MODEL: z.string().optional(),
 
   // Langfuse
   LANGFUSE_SECRET_KEY: z.string().optional(),
@@ -35,7 +41,6 @@ const envSchema = z.object({
   // Google Services
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_API_KEY: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().url().optional(),
   GOOGLE_ACCESS_TOKEN: z.string().optional(),
   GOOGLE_REFRESH_TOKEN: z.string().optional(),
@@ -124,6 +129,11 @@ export const validateEnv = (): EnvConfig => {
           APP_TIMEZONE: process.env.APP_TIMEZONE || 'Europe/Warsaw',
           DISABLE_API_KEY: process.env.DISABLE_API_KEY || 'true',
           OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'test-openai-key',
+          GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+          DEFAULT_LLM_PROVIDER: process.env.DEFAULT_LLM_PROVIDER || 'google',
+          // NOTE: Never use 'gemini-2.0-flash'.
+          DEFAULT_TEXT_MODEL: process.env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash',
+          FALLBACK_TEXT_MODEL: process.env.FALLBACK_TEXT_MODEL || 'gemini-2.5-flash',
         });
       }
     }
@@ -157,7 +167,8 @@ export const logServiceStatus = () => {
   console.log('================================');
   
   const services = [
-    { name: 'OpenAI', enabled: !!env.OPENAI_API_KEY, required: true },
+    { name: 'Google Gemini', enabled: !!env.GOOGLE_API_KEY, required: true },
+    { name: 'OpenAI', enabled: !!env.OPENAI_API_KEY, required: false },
     { name: 'Anthropic', enabled: isServiceEnabled.anthropic(), required: false },
     { name: 'XAI', enabled: isServiceEnabled.xai(), required: false },
     { name: 'Langfuse', enabled: isServiceEnabled.langfuse(), required: false },
@@ -199,7 +210,8 @@ export const logServiceStatus = () => {
  */
 export const getServiceStatus = () => {
   const services = [
-    { name: 'OpenAI', enabled: !!env.OPENAI_API_KEY, required: true },
+    { name: 'Google Gemini', enabled: !!env.GOOGLE_API_KEY, required: true },
+    { name: 'OpenAI', enabled: !!env.OPENAI_API_KEY, required: false },
     { name: 'Anthropic', enabled: isServiceEnabled.anthropic(), required: false },
     { name: 'XAI', enabled: isServiceEnabled.xai(), required: false },
     { name: 'Langfuse', enabled: isServiceEnabled.langfuse(), required: false },

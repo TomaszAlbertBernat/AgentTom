@@ -286,6 +286,14 @@ All endpoints return consistent error responses with appropriate HTTP status cod
     '/api/agi/conversations/{id}/messages': {
       get: { tags: ['AGI'], summary: 'Get conversation messages', parameters: [{ name: 'id', in: 'path', required: true }], responses: { '200': { description: 'OK' } } }
     },
+    '/api/agi/chat': {
+      post: {
+        tags: ['AGI'],
+        summary: 'System chat (non-streaming)',
+        requestBody: { required: true },
+        responses: { '200': { description: 'OK' } }
+      }
+    },
     '/api/conversations': {
       get: { tags: ['Conversations'], summary: 'List conversations (mounted)', responses: { '200': { description: 'OK' } } },
       post: { tags: ['Conversations'], summary: 'Create conversation', responses: { '200': { description: 'OK' } } }

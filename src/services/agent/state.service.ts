@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import { env } from '../../config/env.config';
 import {type State} from '../../types/state';
 import {EventEmitter} from 'events';
 
@@ -79,8 +80,9 @@ const createStateManager = () => {
       current_action: null,
       user_uuid: null,
       conversation_uuid: null,
-      model: 'gpt-4o-mini',
-      alt_model: 'gpt-4o-mini',
+      // NOTE: Never use 'gemini-2.0-flash'.
+      model: env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash',
+      alt_model: 'gemini-2.5-flash',
       temperature: 0.7,
       max_tokens: 16384,
       time: new Date().toISOString()
