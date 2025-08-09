@@ -22,6 +22,7 @@ import { sanitize } from './middleware/sanitize';
 import { authRoutes } from './routes/auth';
 import { agiRoutes } from './routes/agi';
 import { toolRoutes } from './routes/tools';
+import conversations from './routes/conversation';
 import { users_router } from './routes/users';
 import linearRoutes from './routes/linear';
 import files from './routes/files';
@@ -114,6 +115,7 @@ app.get('/docs/openapi.json', c => {
 app.route('/api/auth', authRoutes);
 app.route('/api/agi', agiRoutes);
 app.route('/api/tools', toolRoutes);
+app.route('/api/conversations', conversations);
 app.route('/api/users', users_router);
 app.route('/api/linear', linearRoutes);
 app.route('/api/files', files);

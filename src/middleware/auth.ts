@@ -29,23 +29,23 @@ export const authMiddleware = () => {
       return next();
     }
 
-    const authHeader = c.req.header('Authorization');
+    const authorization = c.req.header('Authorization') || c.req.header('authorization');
+    const xApiKey = c.req.header('X-API-Key') || c.req.header('x-api-key');
+    const xJwt = c.req.header('X-JWT') || c.req.header('x-jwt');
     const disableApiKey = (process.env.DISABLE_API_KEY === 'true') || ((process.env.NODE_ENV || 'development') !== 'production');
-
-    if (!authHeader?.startsWith('Bearer ')) {
-      return c.json({error: 'Missing or invalid authorization header'}, {status: 401});
-    }
-
-    const token = authHeader.split(' ')[1];
 
     let userId: string | null = null;
     let scopes: string[] = [];
 
     if (disableApiKey) {
-      // Prefer JWT-based auth when API key checks are disabled (dev-friendly)
+      // Dev/non-production: accept JWT via Authorization Bearer or X-JWT
+      const jwtToken = (authorization?.startsWith('Bearer ') ? authorization.split(' ')[1] : undefined) || xJwt || '';
+      if (!jwtToken) {
+        return c.json({ error: 'Missing JWT. Provide Authorization: Bearer <jwt> or X-JWT header' }, { status: 401 });
+      }
       try {
         const secret = process.env.JWT_SECRET || 'dev-secret';
-        const payload = jwt.verify(token, secret) as { user_id?: string };
+        const payload = jwt.verify(jwtToken, secret) as { user_id?: string };
         if (!payload?.user_id) {
           return c.json({ error: 'Invalid JWT payload' }, { status: 401 });
         }
@@ -55,12 +55,15 @@ export const authMiddleware = () => {
         return c.json({ error: 'Invalid or expired JWT' }, { status: 401 });
       }
     } else {
-      // Validate the API key in production or when explicitly enabled
+      // Production: prefer X-API-Key for API key auth; fall back to Authorization: Bearer <api_key> for backward compatibility
+      const apiKey = xApiKey || (authorization?.startsWith('Bearer ') ? authorization.split(' ')[1] : undefined);
+      if (!apiKey) {
+        return c.json({ error: 'Missing API key. Provide X-API-Key header.' }, { status: 401 });
+      }
       const validation = await apiKeyService.validateApiKey({
-        key: token,
+        key: apiKey,
         requiredScopes: ['api:access']
       });
-
       if (!validation.valid) {
         return c.json({error: 'Invalid or expired API key'}, {status: 401});
       }
@@ -89,6 +92,7 @@ export const authMiddleware = () => {
       ...request_body,
       user: {
         id: userId,
+        uuid: userId,
         scopes,
       },
       model: validated_model,

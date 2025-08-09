@@ -184,7 +184,116 @@ All endpoints return consistent error responses with appropriate HTTP status cod
       name: 'Health',
       description: 'System health and status endpoints'
     }
-  ]
+  ],
+  paths: {
+    '/api/auth/register': {
+      post: {
+        tags: ['Authentication'],
+        summary: 'Register a new user',
+        requestBody: { required: true },
+        responses: { '200': { description: 'OK' } }
+      }
+    },
+    '/api/auth/login': {
+      post: {
+        tags: ['Authentication'],
+        summary: 'Login and receive JWT',
+        requestBody: { required: true },
+        responses: { '200': { description: 'OK' } }
+      }
+    },
+    '/api/auth/me': {
+      get: {
+        tags: ['Authentication'],
+        summary: 'Get current user',
+        responses: { '200': { description: 'OK' } }
+      }
+    },
+    '/api/tools': {
+      get: {
+        tags: ['Tools'],
+        summary: 'List tools',
+        responses: { '200': { description: 'OK' } }
+      }
+    },
+    '/api/tools/execute': {
+      post: {
+        tags: ['Tools'],
+        summary: 'Execute tool',
+        requestBody: { required: true },
+        responses: { '200': { description: 'OK' } }
+      }
+    },
+    '/api/tools/executions': {
+      get: {
+        tags: ['Tools'],
+        summary: 'Execution history',
+        responses: { '200': { description: 'OK' } }
+      }
+    },
+    '/api/files/upload': {
+      post: {
+        tags: ['Files'],
+        summary: 'Upload file (multipart)',
+        requestBody: { required: true },
+        responses: { '201': { description: 'Created' } }
+      }
+    },
+    '/api/files/upload/base64': {
+      post: {
+        tags: ['Files'],
+        summary: 'Upload file (base64)',
+        requestBody: { required: true },
+        responses: { '201': { description: 'Created' } }
+      }
+    },
+    '/api/files/{uuid}': {
+      get: {
+        tags: ['Files'],
+        summary: 'Get file by UUID',
+        parameters: [{ name: 'uuid', in: 'path', required: true }],
+        responses: { '200': { description: 'OK' }, '404': { description: 'Not Found' } }
+      }
+    },
+    '/api/web/search': {
+      post: {
+        tags: ['Health'],
+        summary: 'Web search',
+        requestBody: { required: true },
+        responses: { '200': { description: 'OK' } }
+      }
+    },
+    '/api/web/get-contents': {
+      post: {
+        tags: ['Health'],
+        summary: 'Fetch page content',
+        requestBody: { required: true },
+        responses: { '200': { description: 'OK' } }
+      }
+    },
+    '/api/web/health': {
+      get: { tags: ['Health'], summary: 'Health', responses: { '200': { description: 'OK' } } }
+    },
+    '/api/web/health/details': {
+      get: { tags: ['Health'], summary: 'Health details', responses: { '200': { description: 'OK' } } }
+    },
+    '/api/agi/conversations': {
+      post: { tags: ['AGI'], summary: 'Create conversation', responses: { '200': { description: 'OK' } } }
+    },
+    '/api/agi/messages': {
+      post: { tags: ['AGI'], summary: 'Send message', requestBody: { required: true }, responses: { '200': { description: 'OK' } } }
+    },
+    '/api/agi/conversations/{id}/messages': {
+      get: { tags: ['AGI'], summary: 'Get conversation messages', parameters: [{ name: 'id', in: 'path', required: true }], responses: { '200': { description: 'OK' } } }
+    },
+    '/api/conversations': {
+      get: { tags: ['Conversations'], summary: 'List conversations (mounted)', responses: { '200': { description: 'OK' } } },
+      post: { tags: ['Conversations'], summary: 'Create conversation', responses: { '200': { description: 'OK' } } }
+    },
+    '/api/conversations/{conversation_uuid}': {
+      get: { tags: ['Conversations'], summary: 'Get conversation', parameters: [{ name: 'conversation_uuid', in: 'path', required: true }], responses: { '200': { description: 'OK' }, '404': { description: 'Not Found' } } }
+    }
+  }
 };
 
 /**
