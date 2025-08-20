@@ -9,6 +9,7 @@ import type {DocumentType} from './document.service';
 import {createTextService} from '../common/text.service';
 import { env } from '../../config/env.config';
 import { createLogger } from '../common/logger.service';
+import { ValidationError } from '../../utils/errors';
 
 const log = createLogger('Agent:Calendar');
 
@@ -107,7 +108,7 @@ const createAuthClient = async ({client_id, client_secret, redirect_uri}: Calend
   const tokens = await loadTokens();
   
   if (!tokens) {
-    throw new Error('No authentication tokens found. Please authenticate first.');
+    throw new ValidationError('No authentication tokens found. Please authenticate first.');
   }
 
   // Set initial credentials
@@ -120,7 +121,7 @@ const createAuthClient = async ({client_id, client_secret, redirect_uri}: Calend
   // Check token expiry
   if (tokens.expiry_date && tokens.expiry_date < Date.now()) {
     if (!tokens.refresh_token) {
-      throw new Error('Token expired and no refresh token available. Please re-authenticate.');
+      throw new ValidationError('Token expired and no refresh token available. Please re-authenticate.');
     }
     
     try {
@@ -136,7 +137,7 @@ const createAuthClient = async ({client_id, client_secret, redirect_uri}: Calend
         auth.setCredentials(new_tokens);
       }
     } catch (error) {
-      throw new Error('Failed to refresh token. Please re-authenticate.');
+      throw new ValidationError('Failed to refresh token. Please re-authenticate.');
     }
   }
 
@@ -343,7 +344,7 @@ const calendarService = {
         .map(([key]) => key);
 
       if (missing_vars.length > 0) {
-        throw new Error(`Missing required environment variables: ${missing_vars.join(', ')}`);
+        throw new ValidationError(`Missing required environment variables: ${missing_vars.join(', ')}`);
       }
 
       const auth = await createAuthClient({
@@ -356,7 +357,7 @@ const calendarService = {
 
       // Validate payload before processing
       if (action !== 'get_auth_url' && !payload) {
-        throw new Error('Payload is required for this action');
+        throw new ValidationError('Payload is required for this action');
       }
 
       switch (action) {
@@ -465,7 +466,7 @@ const calendarService = {
         }
 
         default:
-          throw new Error(`Unknown calendar action: ${action}`);
+          throw new ValidationError(`Unknown calendar action: ${action}`);
       }
     } catch (error) {
       span?.event({

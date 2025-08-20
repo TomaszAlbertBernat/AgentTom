@@ -12,6 +12,7 @@ import { FileType } from '../../types/upload';
 import { completion } from '../common/llm.service';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
+import { google } from 'googleapis';
 import { logger } from '../common/logger.service';
 import type { DocumentType } from '../agent/document.service';
 
@@ -110,6 +111,102 @@ const uploadImageFromUrl = async (url: string, filename?: string): Promise<strin
   return `${process.env.APP_URL}/api/files/${upload_result.uuid}`;
 };
 
+const uploadImageFromBase64 = async (
+  base64: string,
+  filename?: string,
+  mimeType: string = 'image/png'
+): Promise<string> => {
+  const buffer = Buffer.from(base64, 'base64');
+  const finalFilename = filename || `image_${Date.now()}.png`;
+
+  const upload_result = await uploadFile({
+    uuid: uuidv4(),
+    file: new Blob([buffer], { type: mimeType }),
+    type: FileType.IMAGE,
+    original_name: finalFilename
+  });
+
+  return `${process.env.APP_URL}/api/files/${upload_result.uuid}`;
+};
+
+// Prefer OpenAI DALL·E by default; allow optional Vertex Images provider via env flag
+const isVertexImagesEnabled = () => {
+  const provider = (process.env.IMAGE_PROVIDER || 'openai').toLowerCase();
+  const projectId = process.env.VERTEX_PROJECT_ID;
+  const location = process.env.VERTEX_LOCATION;
+  return provider === 'vertex' && !!projectId && !!location;
+};
+
+/**
+ * Generate an image using Vertex AI Images API (Imagen 3) via REST
+ * Requires GOOGLE_APPLICATION_CREDENTIALS or ADC, VERTEX_PROJECT_ID, VERTEX_LOCATION
+ */
+const generateWithVertex = async (prompt: string, size: string) => {
+  const projectId = process.env.VERTEX_PROJECT_ID!;
+  const location = process.env.VERTEX_LOCATION!;
+
+  // Obtain access token using Google Auth
+  const authClient = await google.auth.getClient({
+    scopes: ['https://www.googleapis.com/auth/cloud-platform']
+  });
+  const accessToken = await authClient.getAccessToken();
+
+  // Map size like "1024x1024" to width/height integers
+  const [widthStr, heightStr] = size.split('x');
+  const width = parseInt(widthStr, 10) || 1024;
+  const height = parseInt(heightStr, 10) || 1024;
+
+  const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/imagegeneration:generateImages`;
+
+  const body = {
+    // API accepts either { instances: [{ prompt: { text }, ...}] } or { prompt } depending on version.
+    // Use instances shape for broader compatibility.
+    instances: [
+      {
+        prompt: { text: prompt },
+      }
+    ],
+    parameters: {
+      sampleCount: 1,
+      width,
+      height,
+    }
+  } as any;
+
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Vertex Images generate failed: ${resp.status} ${resp.statusText} ${errText}`);
+  }
+
+  const json = await resp.json();
+
+  // Try multiple response shapes
+  let base64: string | undefined;
+  // Newer Images API
+  base64 = base64 || json?.images?.[0]?.bytesBase64Encoded;
+  // Prediction-style response
+  base64 = base64 || json?.predictions?.[0]?.bytesBase64Encoded;
+  // Generic data field (fallback)
+  base64 = base64 || json?.data?.[0]?.b64_json;
+
+  if (!base64) {
+    throw new Error('Vertex Images response missing base64 image');
+  }
+
+  // Upload and return hosted URL
+  const uploaded_url = await uploadImageFromBase64(base64, `generated_${Date.now()}.png`, 'image/png');
+  return uploaded_url;
+};
+
 // Extend DocumentMetadata to include image-related fields
 interface ImageDocumentMetadata extends DocumentMetadata {
   image_url?: string;
@@ -201,22 +298,27 @@ const imageService = {
           const { prompt, size, quality, style } = parsed.payload;
 
           try {
-            const response = await openai.images.generate({
-              model: "dall-e-3",
-              prompt,
-              n: 1,
-              size: size as "1024x1024" | "1792x1024" | "1024x1792",
-              quality: quality as "standard" | "hd",
-              style: style as "vivid" | "natural"
-            });
+            let uploaded_url: string;
+            if (isVertexImagesEnabled()) {
+              // Optional Vertex Images provider
+              uploaded_url = await generateWithVertex(prompt, size);
+            } else {
+              // Default: OpenAI DALL·E 3
+              const response = await openai.images.generate({
+                model: 'dall-e-3',
+                prompt,
+                n: 1,
+                size: size as '1024x1024' | '1792x1024' | '1024x1792',
+                quality: quality as 'standard' | 'hd',
+                style: style as 'vivid' | 'natural'
+              });
 
-            const image_url = response.data[0].url;
-            if (!image_url) {
-              throw new Error('No image URL in response');
+              const image_url = response.data[0].url;
+              if (!image_url) {
+                throw new Error('No image URL in response');
+              }
+              uploaded_url = await uploadImageFromUrl(image_url, `generated_${Date.now()}.png`);
             }
-
-            // Upload the generated image to our storage
-            const uploaded_url = await uploadImageFromUrl(image_url, `generated_${Date.now()}.png`);
 
             span?.event({
               name: 'image_generation_success',
@@ -239,8 +341,10 @@ const imageService = {
               }
             });
           } catch (error) {
-            logger.error('DALL-E generation error:', error instanceof Error ? error : new Error(String(error)));
-            throw new Error('Failed to generate image with DALL-E');
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.error('Image generation error:', err);
+            // Keep error message generic to avoid leaking provider-specific details
+            throw new Error('Failed to generate image');
           }
         }
 

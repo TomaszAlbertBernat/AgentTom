@@ -5,7 +5,7 @@ const envSchema = z.object({
   // Basic app configuration
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']).default('INFO'),
-  PORT: z.string().transform(Number).pipe(z.number().min(1).max(65535)).default('3000'),
+  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   APP_URL: z.string().url().default('http://localhost:3000'),
   API_KEY: z.string().min(1).optional(),
   JWT_SECRET: z.string().min(1).default('dev-secret'),
@@ -17,6 +17,10 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   XAI_API_KEY: z.string().optional(),
   GOOGLE_API_KEY: z.string().optional(),
+  // Images provider selection (default: OpenAI DALL·E). Set to 'vertex' to use Vertex Images.
+  IMAGE_PROVIDER: z.string().optional(),
+  VERTEX_PROJECT_ID: z.string().optional(),
+  VERTEX_LOCATION: z.string().optional(),
 
   // LLM defaults (optional overrides)
   DEFAULT_LLM_PROVIDER: z.string().optional(),
@@ -87,31 +91,31 @@ export const validateEnv = (): EnvConfig => {
     return envSchema.parse(process.env);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const missingVars = error.errors
-        .filter(err => err.code === 'invalid_type' && err.received === 'undefined')
-        .map(err => err.path.join('.'))
+      const missingVars = error.issues
+        .filter((issue) => issue.code === 'invalid_type' && (issue as any).received === 'undefined')
+        .map((issue) => issue.path.join('.'))
         // In development, ignore missing optional keys like API_KEY
-        .filter(name => (process.env.NODE_ENV || 'development') === 'production' ? true : name !== 'API_KEY');
-      
-      const invalidVars = error.errors
-        .filter(err => err.code !== 'invalid_type' || err.received !== 'undefined')
-        .map(err => `${err.path.join('.')}: ${err.message}`);
+        .filter((name) => (process.env.NODE_ENV || 'development') === 'production' ? true : name !== 'API_KEY');
+
+      const invalidVars = error.issues
+        .filter((issue) => !(issue.code === 'invalid_type' && (issue as any).received === 'undefined'))
+        .map((issue) => `${issue.path.join('.')}: ${issue.message}`);
 
       console.error('❌ Environment validation failed:');
-      
+
       if (missingVars.length > 0) {
         console.error('\n🔴 Missing required environment variables:');
-        missingVars.forEach(varName => console.error(`  - ${varName}`));
+        missingVars.forEach((varName) => console.error(`  - ${varName}`));
       }
-      
+
       if (invalidVars.length > 0) {
         console.error('\n🟡 Invalid environment variables:');
-        invalidVars.forEach(error => console.error(`  - ${error}`));
+        invalidVars.forEach((issueMsg) => console.error(`  - ${issueMsg}`));
       }
 
       console.error('\n💡 Please check your .env file and ensure all required variables are set.');
       console.error('📋 You can use .env-example as a template.\n');
-      
+
       // In development and test modes, do not hard exit to improve DX and allow tests to run
       const nodeEnv = process.env.NODE_ENV || 'development';
       if (nodeEnv !== 'development' && nodeEnv !== 'test') {
@@ -130,10 +134,13 @@ export const validateEnv = (): EnvConfig => {
           DISABLE_API_KEY: process.env.DISABLE_API_KEY || 'true',
           OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'test-openai-key',
           GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+          IMAGE_PROVIDER: process.env.IMAGE_PROVIDER,
+          VERTEX_PROJECT_ID: process.env.VERTEX_PROJECT_ID,
+          VERTEX_LOCATION: process.env.VERTEX_LOCATION,
           DEFAULT_LLM_PROVIDER: process.env.DEFAULT_LLM_PROVIDER || 'google',
           // NOTE: Never use 'gemini-2.0-flash'.
           DEFAULT_TEXT_MODEL: process.env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash',
-          FALLBACK_TEXT_MODEL: process.env.FALLBACK_TEXT_MODEL || 'gemini-2.5-flash',
+          FALLBACK_TEXT_MODEL: process.env.FALLBACK_TEXT_MODEL || 'gpt-4o-mini',
         });
       }
     }
@@ -143,6 +150,12 @@ export const validateEnv = (): EnvConfig => {
 
 // Get validated environment configuration
 export const env = validateEnv();
+
+// Provider env compatibility shims
+// Vercel AI SDK Google provider expects GOOGLE_GENERATIVE_AI_API_KEY; we allow GOOGLE_API_KEY too.
+if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && env.GOOGLE_API_KEY) {
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY = env.GOOGLE_API_KEY;
+}
 
 // Helper functions to check service availability
 export const isServiceEnabled = {

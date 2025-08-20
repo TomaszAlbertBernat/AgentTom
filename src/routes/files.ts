@@ -3,6 +3,7 @@ import {AppEnv} from '../types/hono';
 import {v4 as uuidv4} from 'uuid';
 import {findFileByUuid, uploadFile} from '../services/common/upload.service';
 import {FileType} from '../types/upload';
+import { ValidationError } from '../utils/errors';
 
 const files = new Hono<AppEnv>().post('/upload', async c => {
   try {
@@ -12,7 +13,7 @@ const files = new Hono<AppEnv>().post('/upload', async c => {
     const uuid = formData.get('uuid') as string;
 
     if (!file) {
-      throw new Error('No file provided');
+      throw new ValidationError('No file provided');
     }
 
     const result = await uploadFile({
@@ -79,7 +80,7 @@ const files = new Hono<AppEnv>().post('/upload', async c => {
       return c.json({success: false, error: 'File not found'}, 404);
     }
 
-    return c.newResponse(file.buffer, {
+    return c.newResponse(new Blob([file.buffer], { type: file.mime_type }), {
       headers: {
         'Content-Type': file.mime_type,
         'Content-Disposition': `inline; filename="${file.original_name}"`

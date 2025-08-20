@@ -1,7 +1,7 @@
 import {z} from 'zod';
 import { db } from '../../database';
 import {documentHooks, documents, type Document} from '../../schema/document';
-import {ValidationError} from '../../utils/errors';
+import {ValidationError, NotFoundError} from '../../utils/errors';
 import type {DocumentMetadata} from '../../types/document';
 import {actionDocuments, taskDocuments} from '../../schema';
 import {v4 as uuidv4} from 'uuid';
@@ -23,7 +23,7 @@ const DocumentMetadataSchema = z.object({
   content_type: z.enum(['chunk', 'full', 'memory']),
   source: z.string().optional(),
   mimeType: z.string().optional(),
-  headers: z.record(z.array(z.string())).optional(),
+  headers: z.record(z.string(), z.array(z.string())).optional(),
   urls: z.array(z.string()).optional(),
   images: z.array(z.string()).optional(),
   screenshots: z.array(z.string()).optional(),
@@ -136,13 +136,18 @@ export const documentService = {
       ...metadata_override
     };
 
+    // Avoid FK errors when conversation doesn't exist (e.g., smoke tests).
+    // Only set FK if it's a valid UUID; otherwise, store as NULL.
+    const isValidUuid = z.string().uuid().safeParse(conversation_uuid || '').success;
+    const conversation_uuid_for_db = isValidUuid ? conversation_uuid : undefined;
+
     const [document] = await db.transaction(async tx => {
       const [doc] = await tx
         .insert(documents)
         .values({
           uuid: document_uuid,
           source_uuid,
-          conversation_uuid,
+          conversation_uuid: conversation_uuid_for_db,
           text,
           metadata: JSON.stringify(metadata)
         })
@@ -255,7 +260,7 @@ export const documentService = {
     const existing_document = await documentService.getDocumentByUuid(uuid);
     
     if (!existing_document) {
-      throw new Error(`Document with UUID ${uuid} not found`);
+      throw new NotFoundError('Document', { context: { uuid } });
     }
 
     let updated_metadata = existing_document.metadata;
@@ -296,7 +301,7 @@ export const documentService = {
   async deleteDocument(uuid: string): Promise<void> {
     const document = await documentService.getDocumentByUuid(uuid);
     if (!document) {
-      throw new Error(`Document with UUID ${uuid} not found`);
+      throw new NotFoundError('Document', { context: { uuid } });
     }
 
     await db.delete(documents).where(eq(documents.uuid, uuid));

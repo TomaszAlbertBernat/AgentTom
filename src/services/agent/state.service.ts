@@ -36,7 +36,7 @@ const StateSchema = z.object({
     }))
   }),
   profile: z.object({
-    environment: z.record(z.unknown()),
+    environment: z.record(z.string(), z.unknown()),
     context: z.string(),
     ai_name: z.string(),
     user_name: z.string()

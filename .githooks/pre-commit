@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Keep generated per-agent TODOs in sync before committing (Bun)
+if command -v bun >/dev/null 2>&1; then
+  bun run scripts/splitMaster.ts || true
+fi
+
+exit 0
+
+

@@ -7,6 +7,7 @@ interface ModelSpecs {
 
 export const providers: Record<string, Record<string, ModelSpecs>> = {
   openai: {
+    // OpenAI models retained for fallback only
     'gpt-4o': {
       id: 'gpt-4o',
       contextWindow: 128_000,

@@ -5,6 +5,7 @@ import {z} from 'zod';
 import {documentService} from './document.service';
 import {actionDocuments} from '../../schema/actionDocuments';
 import {Action} from '../../types/agent';
+import { NotFoundError, ValidationError } from '../../utils/errors';
 
 const actionSchema = z.object({
   uuid: z.string(),
@@ -13,7 +14,7 @@ const actionSchema = z.object({
   name: z.string(),
   sequence: z.number(),
   status: z.enum(['pending', 'completed', 'failed']),
-  payload: z.record(z.unknown()).nullable()
+  payload: z.record(z.string(), z.unknown()).nullable()
 });
 
 export const actionService = {
@@ -80,7 +81,7 @@ export const actionService = {
         .where(eq(actions.uuid, uuid))
         .returning();
 
-      if (!action) throw new Error('Action not found');
+      if (!action) throw new NotFoundError('Action');
 
       const document = await documentService.createDocument({
         conversation_uuid: action.task_uuid,
@@ -110,7 +111,7 @@ export const actionService = {
         }
       });
 
-      if (!action_with_documents) throw new Error('Failed to retrieve action with document');
+      if (!action_with_documents) throw new ValidationError('Failed to retrieve action with document');
 
       return {
         ...action_with_documents,

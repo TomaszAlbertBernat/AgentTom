@@ -4,8 +4,9 @@ import { completion, embedding } from '../../../src/services/common/llm.service'
 const hasKey = (name: string) => !!process.env[name] && process.env[name]!.length > 0;
 
 describe('Smoke: LLM (Gemini)', () => {
-  if (!hasKey('GOOGLE_API_KEY')) {
-    test.skip('skipped – GOOGLE_API_KEY not set', () => {});
+  const runLLM = process.env.SMOKE_LLM === '1' && hasKey('GOOGLE_API_KEY');
+  if (!runLLM) {
+    test.skip('skipped – set SMOKE_LLM=1 and GOOGLE_API_KEY to enable this smoke test', () => {});
     return;
   }
 

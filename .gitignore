@@ -82,5 +82,10 @@ site/
 .cursorrules
 .cursorignore
 TODO.md
+TODO_FRONTEND.md
+todo/generated/
 *.tsbuildinfo
 .eslintcache
+
+# Keep backlog (todo/) tracked by default; generated views remain ignored
+README-agent-system.md

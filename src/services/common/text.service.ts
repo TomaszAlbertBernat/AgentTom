@@ -8,6 +8,7 @@
 import {createByModelName} from '@microsoft/tiktokenizer';
 import type {Document, DocumentMetadata} from '../../types/document';
 import {z} from 'zod';
+import { ValidationError } from '../../utils/errors';
 import {v4 as uuidv4} from 'uuid';
 
 /**
@@ -55,7 +56,7 @@ const formatForTokenization = (text: string): string => `<|im_start|>user\n${tex
  */
 const countTokens = (tokenizer: TokenizerState['tokenizer'], text: string): number => {
   if (!tokenizer) {
-    throw new Error('Tokenizer not initialized');
+    throw new ValidationError('Tokenizer not initialized');
   }
   return tokenizer.encode(text, Array.from(SPECIAL_TOKENS.keys())).length;
 };
@@ -72,9 +73,10 @@ const countTokens = (tokenizer: TokenizerState['tokenizer'], text: string): numb
  * we default to an OpenAI tokenizer that approximates token counts.
  */
 const normalizeModelForTokenizer = (modelName: string): string => {
-  if (!modelName) return 'gpt-4o';
-  // If not an OpenAI GPT model, fall back to GPT tokenizer to avoid runtime errors
-  return modelName.startsWith('gpt') ? modelName : 'gpt-4o';
+  // Use a stable tokenizer baseline; for non-OpenAI models, approximate with GPT tokenizer
+  const fallback = 'gpt-4o';
+  if (!modelName) return fallback;
+  return modelName.startsWith('gpt') ? modelName : fallback;
 };
 
 const initializeTokenizer = async (state: TokenizerState, model?: string): Promise<TokenizerState> => {
@@ -258,7 +260,7 @@ export const createTextService = async (config: z.infer<typeof textServiceSchema
    */
   const split = async (text: string, limit: number, metadata?: Partial<DocumentMetadata>): Promise<Document[]> => {
     if (!text) {
-      throw new Error('Text is required for splitting');
+      throw new ValidationError('Text is required for splitting');
     }
 
     state = await initializeTokenizer(state);
@@ -302,8 +304,8 @@ export const createTextService = async (config: z.infer<typeof textServiceSchema
       try {
         return DocumentSchema.parse(chunk);
       } catch (error) {
-        // Avoid noisy console in tight loops; rethrow
-        throw new Error('Failed to create valid document chunk');
+        // Avoid noisy console in tight loops; rethrow as typed error
+        throw new ValidationError('Failed to create valid document chunk', { cause: error });
       }
     });
   };

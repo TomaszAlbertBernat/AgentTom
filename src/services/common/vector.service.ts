@@ -25,7 +25,7 @@ const PointPayloadSchema = z.object({
   source_uuid: z.string(),
   source: z.string(),
   text: z.string(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
   created_at: z.string(),
   updated_at: z.string()
 });

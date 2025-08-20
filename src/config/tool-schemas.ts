@@ -31,7 +31,7 @@ export const memorySchemas = {
   }),
   store: z.object({
     content: z.string(),
-    metadata: z.record(z.string()).optional()
+    metadata: z.record(z.string(), z.string()).optional()
   })
 };
 

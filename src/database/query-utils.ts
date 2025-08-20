@@ -102,11 +102,15 @@ export async function measureQueryTime<T>(
     return result;
   } catch (error) {
     const executionTime = performance.now() - startTime;
-    queryLogger.error(`Query failed after ${executionTime.toFixed(2)}ms`, {
-      queryName,
-      executionTime,
-      error: error instanceof Error ? error.message : String(error)
-    });
+    queryLogger.error(
+      `Query failed after ${executionTime.toFixed(2)}ms`,
+      error instanceof Error ? error : undefined,
+      {
+        queryName,
+        executionTime,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    );
     throw error;
   }
 }

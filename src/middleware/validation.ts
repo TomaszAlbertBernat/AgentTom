@@ -63,11 +63,11 @@ interface ValidationErrorResponse {
  * @returns Formatted error response
  */
 const formatValidationError = (error: z.ZodError, context: string): ValidationErrorResponse => {
-  const details = error.errors.map(err => ({
+  const details = error.issues.map(err => ({
     code: err.code,
     message: err.message,
-    path: err.path,
-    received: 'received' in err ? err.received : undefined
+    path: err.path.filter((p): p is string | number => typeof p === 'string' || typeof p === 'number'),
+    received: 'received' in err ? (err as any).received : undefined
   }));
 
   validationLogger.warn(`Validation failed in ${context}`, {

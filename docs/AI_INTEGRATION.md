@@ -49,13 +49,27 @@ async function generateWithFallback(prompt: string) {
 
 ### Multimodal (vision)
 - Default: Gemini multimodal (e.g., `gemini-1.5-flash`)
-- Current image generation remains with DALL·E; Imagen 3 via Vertex AI Images API is a future option
+- Image generation: default OpenAI DALL·E 3; optional Vertex Images (Imagen 3) behind env flag
+
+#### Vertex Images (Imagen 3) – optional
+- Set env to enable:
+  - `IMAGE_PROVIDER=vertex`
+  - `VERTEX_PROJECT_ID=<gcp-project-id>`
+  - `VERTEX_LOCATION=us-central1` (or your region)
+  - Provide Google credentials via ADC (`GOOGLE_APPLICATION_CREDENTIALS` or workload identity)
+- The service will call Vertex AI Images `imagegeneration:generateImages` and store the returned image.
 
 ### Streaming
 - Streaming uses the Vercel AI SDK `streamText`. If initial stream creation fails with 429, we retry with the fallback model.
 
 ### Rate limits & quotas
 - Detect rate limits via HTTP 429 and provider-specific messages like “quota” or “resource exhausted”. On detection, we switch to the fallback model and can apply short TTL backoff.
+
+### Audio transcription
+- Default: Gemini via AI Studio using a multimodal model (`gemini-1.5-flash`) with inline audio content
+- Fallback: OpenAI Whisper (`whisper-1`) if Gemini is unavailable or errors
+- Configuration: set `GOOGLE_API_KEY` (or `GOOGLE_GENERATIVE_AI_API_KEY`) for Gemini; `OPENAI_API_KEY` enables fallback
+- Smoke tests: enable with `SMOKE_LLM=1` and at least one of the keys above
 
 ### References
 - Google Gemini API

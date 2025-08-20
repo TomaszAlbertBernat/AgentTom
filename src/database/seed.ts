@@ -1,13 +1,10 @@
-import {drizzle} from 'drizzle-orm/bun-sqlite';
-import {Database} from 'bun:sqlite';
 import * as schema from '../schema';
+import { db } from './index';
 import {v4 as uuidv4} from 'uuid';
 import { memory_categories } from '../config/memory.config';
 import {type NewMessage} from '../schema/message';
 import { tools as schemaTools } from '../schema/tool';
-
-const sqlite = new Database('./agi.db');
-const db = drizzle(sqlite, {schema});
+import { documentService } from '../services/agent/document.service';
 
 const categories = memory_categories;
 
@@ -18,15 +15,14 @@ const users = [
     email: 'user@example.com',
     token: process.env.API_KEY, // random token for auth
     active: true,
-    phone: '+1234567890', // placeholder phone
     context: 'test user',
-    environment: JSON.stringify({
+    environment: {
       location: 'Default Location',
       time: new Date().toISOString(),
       weather: 'Clear, 20°C',
       music: 'No music playing',
       activity: 'Idle'
-    })
+    }
   }
 ];
 
@@ -62,52 +58,11 @@ const messages: NewMessage[] = [
   }
 ];
 
-const documents = [
-  {
-    uuid: uuidv4(),
-    source_uuid: conversations[0].uuid,
-    conversation_uuid: conversations[0].uuid,
-    text: 'Project setup instructions...',
-    metadata: JSON.stringify({
-      title: 'Setup Guide',
-      description: 'Instructions to set up the project',
-      headers: [
-        {
-          h1: 'Introduction',
-          h2: 'Requirements',
-          h3: 'Installation',
-          h4: '',
-          h5: '',
-          h6: ''
-        }
-      ],
-      images: ['https://example.com/setup-image1.png'],
-      links: ['https://example.com/setup-guide']
-    }),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-];
+let seededDocumentUuid: string | null = null;
 
-const memories = [
-  {
-    uuid: uuidv4(),
-    name: 'Project Ideas',
-    category_uuid: categories[1].uuid,
-    document_uuid: documents[0].uuid,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-];
+const memories: Array<{ uuid: string; name: string; category_uuid: string; document_uuid: string; created_at: string; updated_at: string; }> = [];
 
-const conversationMemories = [
-  {
-    conversation_uuid: conversations[0].uuid,
-    memory_uuid: memories[0].uuid,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-];
+const conversationMemories: Array<{ conversation_uuid: string; memory_uuid: string; created_at: string; updated_at: string; }> = [];
 
 // Seed tools
 const seedTools = async () => {
@@ -158,13 +113,44 @@ const main = async () => {
     await db.insert(schema.messages).values(messages);
     console.log('✅ Messages seeded successfully');
 
-    await db.insert(schema.documents).values(documents);
-    console.log('✅ Documents seeded successfully');
+    // Create a sample document using the service to ensure metadata alignment
+    const createdDoc = await documentService.createDocument({
+      conversation_uuid: conversations[0].uuid,
+      source_uuid: conversations[0].uuid,
+      text: 'Project setup instructions...\n\n- Install Bun\n- Configure env\n- Run migrations',
+      metadata_override: {
+        name: 'Setup Guide',
+        description: 'Instructions to set up the project',
+        headers: { h1: ['Introduction'], h2: ['Requirements'], h3: ['Installation'] },
+        urls: ['https://example.com/setup-guide'],
+        images: ['https://example.com/setup-image1.png'],
+        should_index: false
+      },
+      content_type: 'full'
+    });
+    seededDocumentUuid = createdDoc.uuid;
+    console.log('✅ Document created successfully');
 
-    await db.insert(schema.memories).values(memories);
+    // Seed a sample memory referencing the created document
+    const memoryUuid = uuidv4();
+    memories.push({
+      uuid: memoryUuid,
+      name: 'Project Ideas',
+      category_uuid: categories[1].uuid,
+      document_uuid: seededDocumentUuid,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+    await db.insert(schema.memories).values(memories as any);
     console.log('✅ Memories seeded successfully');
 
-    await db.insert(schema.conversationMemories).values(conversationMemories);
+    conversationMemories.push({
+      conversation_uuid: conversations[0].uuid,
+      memory_uuid: memoryUuid,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+    await db.insert(schema.conversationMemories).values(conversationMemories as any);
     console.log('✅ Conversation Memories seeded successfully');
   } catch (error) {
     console.error('❌ Error seeding:', error);

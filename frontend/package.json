@@ -1,0 +1,43 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "codegen": "openapi-typescript ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000}/docs/openapi.json -o src/lib/api/types.d.ts",
+    "codegen:check": "bun run codegen || echo 'Skipping codegen (backend not reachable)'",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.84.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "js-cookie": "^3.0.5",
+    "lucide-react": "^0.539.0",
+    "next": "15.4.6",
+    "openapi-fetch": "^0.14.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-hook-form": "^7.62.0",
+    "tailwind-merge": "^3.3.1",
+    "zod": "^4.0.17",
+    "zustand": "^5.0.7"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/cookie": "^1.0.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.4.6",
+    "openapi-typescript": "^7.8.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "@playwright/test": "^1.48.2"
+  }
+}

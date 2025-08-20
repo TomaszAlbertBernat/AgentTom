@@ -9,6 +9,7 @@ import {z} from 'zod';
 import {LangfuseSpanClient} from 'langfuse';
 import {stateManager} from '../agent/state.service';
 import {documentService} from '../agent/document.service';
+import { NotFoundError, ValidationError } from '../../utils/errors';
 import type {DocumentType} from '../agent/document.service';
 import {uploadFile, findFileByUuid} from '../common/upload.service';
 import {FileType} from '../../types/upload';
@@ -318,7 +319,7 @@ const fileService = {
 
         const file_type = getFileTypeFromUrl(path);
         if (!file_type) {
-          throw new Error('Unsupported file type');
+          throw new ValidationError('Unsupported file type', { context: { path } });
         }
 
         const handler = fileTypeHandlers[file_type];
@@ -341,7 +342,7 @@ const fileService = {
           }
         });
       } else {
-        throw new Error('Local path loading not implemented');
+        throw new ValidationError('Local path loading not implemented', { context: { path } });
       }
     } catch (error) {
       span?.event({
@@ -448,7 +449,7 @@ const fileService = {
           const doc = await documentService.getDocumentByUuid(uuid);
           
           if (!doc) {
-            throw new Error(`Document with UUID ${uuid} not found`);
+            throw new NotFoundError('Document', { context: { uuid } });
           }
           
           return doc;

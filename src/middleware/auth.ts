@@ -8,12 +8,14 @@ import {Context, Next} from 'hono';
 import {v4 as uuidv4} from 'uuid';
 import {providers} from '../config/llm.config';
 import {apiKeyService} from '../services/common/api-key.service';
+import { env } from '../config/env.config';
 import jwt from 'jsonwebtoken';
 
 // Paths that don't require authentication
 const PUBLIC_PATHS = [
   /^\/api\/auth\/google(?:\/.*)?$/,
   /^\/api\/auth\/(register|login|me)$/,
+  /^\/api\/auth\/api-keys$/,
   /^\/(api\/auth|api\/files|api\/file)\/[0-9a-f-]+$/i,
   /^\/api\/auth\/spotify\/(?:callback|authorize)/
 ];
@@ -79,7 +81,8 @@ export const authMiddleware = () => {
 
     const supported_models = Object.values(providers)
       .flatMap(provider => Object.keys(provider));
-    const default_model = 'gpt-4';
+    const configured_default = env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash';
+    const default_model = configured_default === 'gemini-2.0-flash' ? 'gemini-2.5-flash' : configured_default;
     const requested_model = is_multipart ? default_model : (request_body as any).model;
     const validated_model = supported_models.includes(requested_model) ? requested_model : default_model;
 

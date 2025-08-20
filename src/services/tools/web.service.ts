@@ -13,6 +13,7 @@ import {v4 as uuidv4} from 'uuid';
 import {LangfuseSpanClient} from 'langfuse';
 import {documentService} from '../agent/document.service';
 import {createTokenizer} from '../common/text.service';
+import { ValidationError } from '../../utils/errors';
 import type {DocumentType} from '../agent/document.service';
 import {whitelistedDomains} from '../../config/websearch.config';
 import {prompt as useSearchPrompt} from '../../prompts/tools/search.use';
@@ -119,7 +120,7 @@ const webService = {
       const scrape_result = await firecrawl.scrapeUrl(url, {formats: ['markdown']}) as ScrapeResult;
 
       if ('error' in scrape_result) {
-        throw new Error(scrape_result.error);
+        throw new ValidationError(scrape_result.error);
       }
 
       const content = scrape_result.markdown?.trim() || '';
@@ -394,7 +395,7 @@ const webService = {
       return webService.getContents(url, 'unknown', span);
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw new ValidationError(`Unknown action: ${action}`);
   }
 };
 

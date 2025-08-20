@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { AppEnv } from '../types/hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,18 +8,26 @@ import { conversations } from '../schema/conversation';
 import { messages } from '../schema/message';
 import { eq } from 'drizzle-orm';
 import { completion } from '../services/common/llm.service';
+import { streamResponse } from '../utils/response';
+import { observer } from '../services/agent/observer.service';
 
 // The auth middleware populates c.get('request').user
-const agi = new Hono();
+const agi = new Hono<AppEnv>();
 
 // Default model for AGI routes
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 // Validation schemas
-const messageSchema = z.object({
-  content: z.string().min(1),
-  conversation_id: z.string().optional(),
-});
+const messageSchema = z.union([
+  z.object({
+    content: z.string().min(1),
+    conversation_id: z.string().optional(),
+  }),
+  z.object({
+    message: z.string().min(1),
+    conversation_id: z.string().optional(),
+  })
+]);
 
 // Cron/system chat schema
 const cronChatSchema = z.object({
@@ -46,7 +55,9 @@ agi.post('/conversations', async (c) => {
 
 // Send message
 agi.post('/messages', zValidator('json', messageSchema), async (c) => {
-  const { content, conversation_id } = c.req.valid('json');
+  const body = c.req.valid('json') as any;
+  const content = body.content ?? body.message;
+  const conversation_id = body.conversation_id as string | undefined;
   const req = c.get('request') as any;
   const user_id = req?.user?.uuid || req?.user?.id;
 
@@ -113,6 +124,90 @@ agi.post('/messages', zValidator('json', messageSchema), async (c) => {
     conversation_id: current_conversation_id,
     response: ai_response,
   });
+});
+
+// Streaming chat (SSE)
+agi.post('/chat/stream', zValidator('json', messageSchema), async (c) => {
+  const body = c.req.valid('json') as any;
+  const content = body.content ?? body.message;
+  const conversation_id = body.conversation_id as string | undefined;
+  const req = c.get('request') as any;
+  const user_id = req?.user?.uuid || req?.user?.id;
+
+  // Ensure conversation exists
+  let current_conversation_id = conversation_id;
+  if (!current_conversation_id) {
+    current_conversation_id = uuidv4();
+    await db.insert(conversations).values({
+      uuid: current_conversation_id,
+      user_id,
+      name: 'Chat Conversation',
+    });
+  }
+
+  // Store user message
+  await db.insert(messages).values({
+    uuid: uuidv4(),
+    conversation_uuid: current_conversation_id,
+    role: 'user',
+    content_type: 'text',
+    content,
+  });
+
+  // Build conversation history
+  const history = await db.query.messages.findMany({
+    where: (messages, { eq }) => eq(messages.conversation_uuid, current_conversation_id),
+    orderBy: (messages, { asc }) => [asc(messages.created_at)],
+  });
+
+  const llm_messages = history
+    .filter(msg => msg.role !== 'tool' && msg.content)
+    .map(msg => ({
+      role: msg.role as 'user' | 'assistant' | 'system',
+      content: msg.content!,
+    }));
+
+  // Initialize trace and generation for streaming
+  const trace = observer.initializeTrace('agi_chat_stream')!;
+  const generation = observer.startGeneration({
+    name: 'completion_stream',
+    input: llm_messages,
+  });
+
+  // Create async iterable text stream
+  const text_stream = await completion.stream({
+    model: DEFAULT_MODEL,
+    messages: llm_messages,
+    temperature: 0.7,
+    max_tokens: 2000,
+    user: { uuid: user_id, name: 'agi-stream' }
+  });
+
+  // Convert AsyncIterable<string> to ReadableStream<string>
+  const readable = new ReadableStream<string>({
+    async start(controller) {
+      try {
+        for await (const chunk of text_stream as AsyncIterable<string>) {
+          controller.enqueue(chunk);
+        }
+        controller.close();
+      } catch (err) {
+        controller.error(err);
+      }
+    }
+  });
+
+  return streamResponse(
+    c,
+    readable,
+    {
+      traceId: trace.id,
+      generationId: generation.id,
+      messages: llm_messages,
+      conversation_id: current_conversation_id,
+    },
+    DEFAULT_MODEL
+  );
 });
 
 // Get conversation history

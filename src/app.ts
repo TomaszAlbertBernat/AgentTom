@@ -11,6 +11,7 @@ import { HTTPException } from 'hono/http-exception';
 import { swaggerUI } from '@hono/swagger-ui';
 import { openApiConfig } from './config/openapi.config';
 import { createLogger } from './services/common/logger.service';
+import { errorHandler } from './middleware/error';
 
 // Import middleware
 import { authMiddleware } from './middleware/auth';
@@ -82,6 +83,9 @@ app.use('*', sanitize());
 
 // Authentication (skip for public routes)
 app.use('/api/*', authMiddleware());
+
+// Global error middleware (structured, typed responses)
+app.use('*', errorHandler());
 
 // Error handling
 app.onError((err, c) => {

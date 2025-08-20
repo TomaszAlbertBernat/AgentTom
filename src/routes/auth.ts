@@ -12,6 +12,8 @@ import { users } from '../schema/user';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { apiKeyService } from '../services/common/api-key.service';
+import { apiKeys } from '../schema/api-keys';
 
 
 // Session interfaces
@@ -212,6 +214,9 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
   }
 
   // Compare password
+  if (!user.password) {
+    return c.json({ error: 'Invalid credentials' }, 401);
+  }
   const passwordMatch = await bcrypt.compare(password, user.password);
   if (!passwordMatch) {
     return c.json({ error: 'Invalid credentials' }, 401);
@@ -243,3 +248,40 @@ auth.get('/me', jwtMiddleware, async (c) => {
 });
 
 export { auth as authRoutes };
+
+// API Key management (JWT-protected)
+// Create/mint a new API key for the authenticated user
+const createApiKeyRequestSchema = z.object({
+  name: z.string().min(1),
+  expiresAt: z.string().datetime().optional(),
+  scopes: z.array(z.string()).optional(),
+  maxRequestsPerDay: z.number().int().positive().optional()
+});
+
+auth.post('/api-keys', jwtMiddleware, zValidator('json', createApiKeyRequestSchema), async (c) => {
+  const { name, expiresAt, scopes, maxRequestsPerDay } = c.req.valid('json');
+  const jwtPayload = c.get('jwtPayload' as any) as { user_id?: string };
+  const userId = jwtPayload?.user_id;
+
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const { key } = await apiKeyService.createApiKey({
+    userId,
+    name,
+    expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+    scopes,
+    maxRequestsPerDay
+  });
+
+  return c.json({
+    key,
+    meta: {
+      name,
+      scopes: scopes || [],
+      maxRequestsPerDay: maxRequestsPerDay || 1000,
+      expiresAt: expiresAt || null
+    }
+  }, 201);
+});

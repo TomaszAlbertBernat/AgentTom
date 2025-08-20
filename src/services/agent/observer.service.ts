@@ -1,14 +1,15 @@
-import {Langfuse, LangfuseTraceClient, LangfuseSpanClient, LangfuseGenerationClient} from 'langfuse';
+import {Langfuse as LangfuseDefault, LangfuseTraceClient, LangfuseSpanClient, LangfuseGenerationClient} from 'langfuse';
 import {z} from 'zod';
 import {stateManager} from './state.service';
 import {v4 as uuidv4} from 'uuid';
 import {CoreMessage} from 'ai';
+import { ValidationError, NotFoundError } from '../../utils/errors';
 
 const GenerationInputSchema = z.object({
   name: z.string(),
   input: z.unknown(),
   output: z.unknown().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   level: z.enum(['DEBUG', 'DEFAULT', 'WARNING', 'ERROR']).optional(),
   statusMessage: z.string().optional()
 });
@@ -21,8 +22,11 @@ interface ObserverService {
   activeGenerations: Map<string, LangfuseGenerationClient>;
 }
 
-const createObserver = () => {
-  const langfuse = new Langfuse({
+export const createObserver = () => {
+  // Allow tests to inject a fake Langfuse via globalThis.__Langfuse
+  const LangfuseImpl = (globalThis as any).__Langfuse || LangfuseDefault;
+
+  const langfuse = new LangfuseImpl({
     secretKey: process.env.LANGFUSE_SECRET_KEY,
     publicKey: process.env.LANGFUSE_PUBLIC_KEY,
     baseUrl: process.env.LANGFUSE_HOST,
@@ -58,7 +62,7 @@ const createObserver = () => {
     },
 
     startSpan: (name: string, metadata?: Record<string, unknown>) => {
-      if (!observer.trace) throw new Error('Trace not initialized');
+      if (!observer.trace) throw new ValidationError('Trace not initialized');
 
       const span = observer.trace.span({
         name,
@@ -75,18 +79,18 @@ const createObserver = () => {
 
     endSpan: (spanId: string, output?: unknown) => {
       const span = observer.activeSpans.get(spanId);
-      if (!span) throw new Error(`Span with id ${spanId} not found`);
+      if (!span) throw new NotFoundError(`Span with id ${spanId}`);
 
       span.end({output});
       observer.activeSpans.delete(spanId);
     },
 
     startGeneration: (params: GenerationInput, parentId?: string) => {
-      if (!observer.trace) throw new Error('Trace not initialized');
+      if (!observer.trace) throw new ValidationError('Trace not initialized');
 
       const parentSpan = parentId ? observer.activeSpans.get(parentId) : null;
       if (!parentSpan && parentId) {
-        throw new Error(`Parent span with id ${parentId} not found`);
+        throw new NotFoundError(`Parent span with id ${parentId}`);
       }
 
       const state = stateManager.getState();
@@ -108,7 +112,7 @@ const createObserver = () => {
 
     endGeneration: (generationId: string, output?: unknown) => {
       const generation = observer.activeGenerations.get(generationId);
-      if (!generation) throw new Error(`Generation with id ${generationId} not found`);
+      if (!generation) throw new NotFoundError(`Generation with id ${generationId}`);
 
       generation.end({output});
       observer.activeGenerations.delete(generationId);
@@ -119,10 +123,10 @@ const createObserver = () => {
 
       if (parentId) {
         const parentSpan = observer.activeSpans.get(parentId);
-        if (!parentSpan) throw new Error(`Parent span with id ${parentId} not found`);
+        if (!parentSpan) throw new NotFoundError(`Parent span with id ${parentId}`);
         parent = parentSpan;
       } else {
-        if (!observer.trace) throw new Error('Trace not initialized');
+        if (!observer.trace) throw new ValidationError('Trace not initialized');
         parent = observer.trace;
       }
 
@@ -133,7 +137,7 @@ const createObserver = () => {
     },
 
     finalizeTrace: async (traceId: string, messages: CoreMessage[], completions: unknown[]) => {
-      if (!observer.trace) throw new Error('Trace not initialized');
+      if (!observer.trace) throw new ValidationError('Trace not initialized');
 
       await observer.trace.update({
         input: messages,

@@ -1,14 +1,37 @@
 // @cspell:ignore chatcmpl logprobs
-import {embed, generateText, generateObject, streamText} from 'ai';
+import { embed as aiEmbed, generateText as aiGenerateText, generateObject as aiGenerateObject, streamText as aiStreamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import OpenAI, { toFile } from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import {type CompletionConfig} from '../../types/llm';
 import type {CoreMessage} from 'ai';
 import type {ChatCompletion} from 'openai/resources/chat/completions';
 import {tempFile} from './upload.service';
+import { ValidationError } from '../../utils/errors';
 import {providers} from '../../config/llm.config';
+import { env } from '../../config/env.config';
+
+// Lightweight indirection layer to make AI SDK calls testable without network I/O
+type AiOps = {
+  generateText: typeof aiGenerateText;
+  streamText: typeof aiStreamText;
+  generateObject: typeof aiGenerateObject;
+  embed: typeof aiEmbed;
+};
+
+let aiOps: AiOps = {
+  generateText: aiGenerateText,
+  streamText: aiStreamText,
+  generateObject: aiGenerateObject,
+  embed: aiEmbed,
+};
+
+// Test-only hook: allows unit tests to stub AI SDK calls
+export function __setAiOpsForTest(overrides: Partial<AiOps>) {
+  aiOps = { ...aiOps, ...overrides };
+}
 
 /**
  * Creates a base configuration for LLM operations
@@ -18,29 +41,79 @@ import {providers} from '../../config/llm.config';
  * @returns Base configuration with resolved provider and validated parameters
  * @throws {Error} When model is not found in configuration
  */
-// NOTE: Do not use 'gemini-2.0-flash'. Default to 'gemini-2.5-flash'.
-const createBaseConfig = ({model = 'gemini-2.5-flash', messages, temperature = 0.7, max_tokens = 16384, user}: CompletionConfig) => {
+// NOTE: Do not use 'gemini-2.0-flash'. Default to env DEFAULT_TEXT_MODEL or 'gemini-2.5-flash'.
+const resolveDefaultModel = () => {
+  const configured = env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash';
+  return configured === 'gemini-2.0-flash' ? 'gemini-2.5-flash' : configured;
+};
+
+const resolveFallbackModel = () => {
+  const configured = env.FALLBACK_TEXT_MODEL || 'gpt-4o-mini';
+  // If user configured forbidden Gemini model, replace with 2.5 flash
+  return configured === 'gemini-2.0-flash' ? 'gemini-2.5-flash' : configured;
+};
+
+const isRateLimitOrQuotaError = (error: unknown): boolean => {
+  const err = error as any;
+  const status = err?.status || err?.response?.status || err?.cause?.status;
+  const message = (err?.message || err?.response?.data || '').toString().toLowerCase();
+  return status === 429 || message.includes('rate limit') || message.includes('quota') || message.includes('resource exhausted');
+};
+
+type NormalizedErrorType =
+  | 'rate_limit'
+  | 'auth'
+  | 'invalid_request'
+  | 'timeout'
+  | 'content_filter'
+  | 'server'
+  | 'network'
+  | 'unknown';
+
+function detectErrorType(err: any): NormalizedErrorType {
+  const status = err?.status || err?.response?.status || err?.cause?.status;
+  const msg = (err?.message || err?.response?.data || '').toString().toLowerCase();
+  if (status === 429 || msg.includes('rate limit') || msg.includes('quota') || msg.includes('resource exhausted')) return 'rate_limit';
+  if (status === 401 || msg.includes('invalid api key') || msg.includes('unauthorized')) return 'auth';
+  if (status === 400 || msg.includes('bad request') || msg.includes('invalid') || msg.includes('malformed')) return 'invalid_request';
+  if (status === 408 || msg.includes('timeout')) return 'timeout';
+  if (status && status >= 500) return 'server';
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('socket')) return 'network';
+  return 'unknown';
+}
+
+function normalizeAIError(error: unknown, provider: string, model: string) {
+  const err: any = error || {};
+  const type = detectErrorType(err);
+  const status = err?.status || err?.response?.status || err?.cause?.status;
+  const code = err?.code || err?.response?.data?.code || (type === 'rate_limit' ? 'RATE_LIMIT' : undefined);
+  const rawMessage = (err?.message || err?.response?.data || '').toString();
+  const message = rawMessage || 'Unknown LLM provider error';
+  return { type, code, status, provider, model, message };
+}
+
+const createBaseConfig = ({model = resolveDefaultModel(), messages, temperature = 0.7, max_tokens = 16384, user}: CompletionConfig) => {
   const provider = Object.entries(providers).find(([_, models]) => 
     Object.keys(models).includes(model)
   )?.[0] ?? 'openai';
 
   const modelSpec = providers[provider][model];
   if (!modelSpec) {
-    throw new Error(`Model ${model} not found in configuration`);
+    throw new ValidationError(`Model ${model} not found in configuration`);
   }
 
   // Return the actual LanguageModelV1 object based on provider
   let languageModel;
   if (provider === 'openai') {
     if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is not set. Provide a valid key or choose a model from a configured provider.');
+      throw new ValidationError('OPENAI_API_KEY is not set. Provide a valid key or choose a model from a configured provider.');
     }
     languageModel = openai(model);
   } else if (provider === 'anthropic') {
     languageModel = anthropic(model);
   } else if (provider === 'google') {
     if (!process.env.GOOGLE_API_KEY) {
-      throw new Error('GOOGLE_API_KEY is not set. Provide a valid key or choose a different model.');
+      throw new ValidationError('GOOGLE_API_KEY is not set. Provide a valid key or choose a different model.');
     }
     languageModel = google(model);
   } else {
@@ -73,7 +146,7 @@ const createBaseConfig = ({model = 'gemini-2.5-flash', messages, temperature = 0
  * ```typescript
  * // Text completion
  * const text = await completion.text({
- *   model: 'gpt-4o',
+ *   model: 'gemini-2.5-flash',
  *   messages: [{ role: 'user', content: 'Hello, world!' }],
  *   user: { uuid: 'user-123' },
  *   temperature: 0.7
@@ -81,7 +154,7 @@ const createBaseConfig = ({model = 'gemini-2.5-flash', messages, temperature = 0
  * 
  * // Streaming completion
  * const stream = await completion.stream({
- *   model: 'gpt-4o',
+ *   model: 'gemini-2.5-flash',
  *   messages: [{ role: 'user', content: 'Write a story...' }],
  *   user: { uuid: 'user-123' }
  * });
@@ -109,7 +182,7 @@ export const completion = {
    * ```typescript
    * // Simple text generation
    * const text = await completion.text({
-   *   model: 'gpt-4o',
+ *   model: 'gemini-2.5-flash',
    *   messages: [
    *     { role: 'system', content: 'You are a helpful assistant.' },
    *     { role: 'user', content: 'Explain quantum computing in simple terms.' }
@@ -125,16 +198,30 @@ export const completion = {
    * ```
    */
   text: async ({max_tokens = 16384, ...config}: CompletionConfig, openAIFormat = false): Promise<string | ChatCompletion> => {
+    const primaryModel = (config.model && config.model !== 'gemini-2.0-flash') ? config.model : resolveDefaultModel();
+    const fallbackModel = resolveFallbackModel();
     try {
-      const result = await generateText({
-        ...createBaseConfig(config),
+      const result = await aiOps.generateText({
+        ...createBaseConfig({...config, model: primaryModel}),
         maxTokens: max_tokens
       });
-
-      // NOTE: Never use 'gemini-2.0-flash'. Prefer 'gemini-2.5-flash'.
-      return openAIFormat ? generateResponseBody(result.text, config.model || 'gemini-2.5-flash', result.usage) : result.text;
+      return openAIFormat ? generateResponseBody(result.text, primaryModel, result.usage) : result.text;
     } catch (error) {
-      throw new Error(`Text completion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Retry with fallback on rate limit/quota
+      if (isRateLimitOrQuotaError(error) && fallbackModel !== primaryModel) {
+        try {
+          const result = await aiOps.generateText({
+            ...createBaseConfig({...config, model: fallbackModel}),
+            maxTokens: max_tokens
+          });
+          return openAIFormat ? generateResponseBody(result.text, fallbackModel, result.usage) : result.text;
+        } catch (fallbackError) {
+          const norm = normalizeAIError(fallbackError, 'fallback', fallbackModel);
+          throw new Error(`Text completion failed after fallback [${norm.type}${norm.status ? ` ${norm.status}` : ''}]: ${norm.message}`);
+        }
+      }
+      const norm = normalizeAIError(error, 'primary', primaryModel);
+      throw new Error(`Text completion failed [${norm.type}${norm.status ? ` ${norm.status}` : ''}]: ${norm.message}`);
     }
   },
 
@@ -154,7 +241,7 @@ export const completion = {
    * @example
    * ```typescript
    * const stream = await completion.stream({
-   *   model: 'gpt-4o',
+ *   model: 'gemini-2.5-flash',
    *   messages: [
    *     { role: 'user', content: 'Write a creative story about AI.' }
    *   ],
@@ -170,19 +257,31 @@ export const completion = {
    * ```
    */
   stream: async ({max_tokens = 16384, ...config}: CompletionConfig) => {
+    const primaryModel = (config.model && config.model !== 'gemini-2.0-flash') ? config.model : resolveDefaultModel();
+    const fallbackModel = resolveFallbackModel();
     try {
       const provider = Object.entries(providers).find(([_, models]) => 
-        // NOTE: Never use 'gemini-2.0-flash'.
-        Object.keys(models).includes(config.model || 'gemini-2.5-flash')
+        Object.keys(models).includes(primaryModel)
       )?.[0] ?? 'openai';
 
-      const {textStream} = streamText({
-        ...createBaseConfig(config),
-        maxTokens: Math.min(max_tokens, providers[provider][config.model || 'gemini-2.5-flash'].maxOutput)
+      const {textStream} = aiOps.streamText({
+        ...createBaseConfig({...config, model: primaryModel}),
+        maxTokens: Math.min(max_tokens, providers[provider][primaryModel].maxOutput)
       });
       return textStream;
     } catch (error) {
-      throw new Error(`Stream completion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      if (isRateLimitOrQuotaError(error) && fallbackModel !== primaryModel) {
+        const provider = Object.entries(providers).find(([_, models]) => 
+          Object.keys(models).includes(fallbackModel)
+        )?.[0] ?? 'openai';
+        const {textStream} = aiOps.streamText({
+          ...createBaseConfig({...config, model: fallbackModel}),
+          maxTokens: Math.min(max_tokens, providers[provider][fallbackModel].maxOutput)
+        });
+        return textStream;
+      }
+      const norm = normalizeAIError(error, 'primary', primaryModel);
+      throw new Error(`Stream completion failed [${norm.type}${norm.status ? ` ${norm.status}` : ''}]: ${norm.message}`);
     }
   },
 
@@ -204,7 +303,7 @@ export const completion = {
    * }
    * 
    * const analysis = await completion.object<AnalysisResult>({
-   *   model: 'gpt-4o',
+ *   model: 'gemini-2.5-flash',
    *   messages: [
    *     {
    *       role: 'system',
@@ -220,26 +319,40 @@ export const completion = {
    * ```
    */
   object: async <T = unknown>(config: CompletionConfig): Promise<T> => {
+    const primaryModel = (config.model && config.model !== 'gemini-2.0-flash') ? config.model : resolveDefaultModel();
+    const fallbackModel = resolveFallbackModel();
     try {
       const provider = Object.entries(providers).find(([_, models]) => 
-        Object.keys(models).includes(config.model || 'gemini-2.5-flash')
+        Object.keys(models).includes(primaryModel)
       )?.[0] ?? 'openai';
 
       if (provider === 'anthropic') {
         const result = await completion.text({
           ...config,
-          max_tokens: providers[provider][config.model || 'gemini-2.5-flash'].maxOutput
+          model: primaryModel,
+          max_tokens: providers[provider][primaryModel].maxOutput
         });
         return JSON.parse(result as string) as T;
       }
 
-      const {object} = await generateObject({
-        ...createBaseConfig(config),
+      const {object} = await aiOps.generateObject({
+        ...createBaseConfig({...config, model: primaryModel}),
         output: 'no-schema'
       });
       return object as T;
     } catch (error) {
-      throw new Error(`Object completion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      if (isRateLimitOrQuotaError(error) && fallbackModel !== primaryModel) {
+        // Fallback to text and JSON.parse if generateObject not supported by fallback
+        try {
+          const result = await completion.text({ ...config, model: fallbackModel });
+          return JSON.parse(result as string) as T;
+        } catch (fallbackError) {
+          const norm = normalizeAIError(fallbackError, 'fallback', fallbackModel);
+          throw new Error(`Object completion failed after fallback [${norm.type}${norm.status ? ` ${norm.status}` : ''}]: ${norm.message}`);
+        }
+      }
+      const norm = normalizeAIError(error, 'primary', primaryModel);
+      throw new Error(`Object completion failed [${norm.type}${norm.status ? ` ${norm.status}` : ''}]: ${norm.message}`);
     }
   }
 };
@@ -265,12 +378,23 @@ export const completion = {
  * ```
  */
 export const embedding = async (text: string) => {
-  const {embedding} = await embed({
-    model: google.embedding('text-embedding-004'),
-    value: text
-  });
-
-  return embedding;
+  try {
+    const {embedding} = await aiOps.embed({
+      model: google.embedding('text-embedding-004'),
+      value: text
+    });
+    return embedding;
+  } catch (error) {
+    // Fallback to OpenAI embeddings if available
+    if (process.env.OPENAI_API_KEY) {
+      const {embedding} = await aiOps.embed({
+        model: openai.embedding('text-embedding-3-large'),
+        value: text
+      });
+      return embedding;
+    }
+    throw error instanceof Error ? error : new Error('Embedding generation failed');
+  }
 };
 
 /**
@@ -283,7 +407,7 @@ export const embedding = async (text: string) => {
  * 
  * @example
  * ```typescript
- * const chunk = generateChunk('Hello, ', 'gpt-4o');
+ * const chunk = generateChunk('Hello, ', 'gemini-2.5-flash');
  * // Returns: { id: 'chatcmpl-...', object: 'chat.completion.chunk', ... }
  * ```
  */
@@ -311,7 +435,7 @@ export function generateChunk(delta: string, model: string) {
  * ```typescript
  * const response = generateResponseBody(
  *   'Hello! How can I help you today?',
- *   'gpt-4o',
+ *   'gemini-2.5-flash',
  *   { promptTokens: 20, completionTokens: 8, totalTokens: 28 }
  * );
  * ```
@@ -436,18 +560,55 @@ export const transcription = {
     audio_buffer: Buffer,
     config: TranscriptionConfig = { language: 'en' }
   ): Promise<string> => {
+    // Prefer Gemini audio transcription when available; fall back to Whisper
+    const useGoogle = !!(process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+
+    // Helper to try Gemini transcription with a specific mime
+    const tryGemini = async (mimeType: string): Promise<string> => {
+      const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY;
+      if (!apiKey) throw new Error('Missing Google API key');
+      const genAI = new GoogleGenerativeAI(apiKey);
+      // Use a multimodal-capable Gemini model for audio; avoid 2.0 models explicitly
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const instruction = [
+        'Transcribe the following audio into plain text.',
+        `Language: ${config.language || 'en'}.`,
+        'Return only the transcript, with no extra commentary.'
+      ].join(' ');
+      const parts: any[] = [
+        { text: instruction },
+        { inlineData: { data: audio_buffer.toString('base64'), mimeType } }
+      ];
+      const result = await model.generateContent(parts as any);
+      const text = (result as any)?.response?.text?.() ?? (result as any)?.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (typeof text !== 'string') throw new Error('Gemini transcription produced no text');
+      return text;
+    };
+
+    // Attempt Gemini first if configured
+    if (useGoogle) {
+      try {
+        // First try OGG; if the buffer is MP3/other, retry with a generic type
+        try {
+          return await tryGemini('audio/ogg');
+        } catch (inner) {
+          return await tryGemini('audio/mpeg');
+        }
+      } catch (_) {
+        // fall through to Whisper
+      }
+    }
+
+    // Whisper fallback path (existing behavior)
     const temp = await tempFile.fromBuffer(audio_buffer, 'ogg');
-    
     try {
       const file = await toFile(audio_buffer, 'audio.ogg');
-      
       const result = await getOpenAIClient().audio.transcriptions.create({
         file,
         model: config.model || 'whisper-1',
         language: config.language,
         prompt: config.prompt,
       });
-      
       return result.text;
     } finally {
       await temp.cleanup();

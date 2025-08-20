@@ -10,7 +10,12 @@
     "setup:linear": "bun run scripts/setup-linear.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",
-    "test:coverage": "bun test --coverage"
+    "test:coverage": "bun test --coverage",
+    "build": "tsc --noEmit",
+    "todo:split": "bun run scripts/splitMaster.ts",
+    "todo:merge": "bun run scripts/mergeAgentUpdates.ts",
+    "todo:import": "bun run scripts/importTodos.ts",
+    "todo:hooks": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.12",
@@ -37,6 +42,7 @@
     "fluent-ffmpeg": "^2.1.3",
     "glob": "^10.3.10",
     "googleapis": "^148.0.0",
+    "@google/generative-ai": "^0.21.0",
     "hono": "^4.6.10",
     "jsonwebtoken": "^9.0.2",
     "langfuse": "^3.37.2",

@@ -48,7 +48,7 @@ export default new Hono<AppEnv>()
     } catch (error) {
       console.log(error);
       if (error instanceof z.ZodError) {
-        return c.json({error: 'Invalid request data', details: error.errors}, 400);
+        return c.json({error: 'Invalid request data', details: error.issues}, 400);
       }
       return c.json({error: 'Failed to create conversation'}, 500);
     }

@@ -27,7 +27,7 @@ interface AppContext {
 const executeToolSchema = z.object({
   tool_name: z.string().min(1, 'Tool name is required'),
   action: z.string().min(1, 'Action is required'),
-  parameters: z.record(z.any()).default({}),
+  parameters: z.record(z.string(), z.any()).default({}),
   timeout: z.number().min(1000).max(300000).optional().default(30000), // 30s default, max 5min
 });
 
@@ -172,7 +172,7 @@ tools_router.post('/execute', zValidator('json', executeToolSchema), async (c) =
       execution_id,
       execution_time_ms: execution_time,
       details: toolError.details
-    }, statusCode as any);
+    }, statusCode as import('hono/utils/http-status').StatusCode);
   }
 });
 
@@ -260,7 +260,7 @@ tools_router.post('/test-error-handling', async (c) => {
       code: toolError.code,
       details: toolError.details,
       test_result: 'Error handling working correctly'
-    }, statusCode as any);
+    }, statusCode as import('hono/utils/http-status').StatusCode);
   }
 });
 

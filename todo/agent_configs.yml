@@ -1,0 +1,18 @@
+agents:
+  - name: backend
+    tag_match: backend
+    output: todo/generated/todo_backend.md
+  - name: frontend
+    tag_match: frontend
+    output: todo/generated/todo_frontend.md
+  - name: ai
+    tag_match: ai
+    output: todo/generated/todo_ai.md
+  - name: docs
+    tag_match: docs
+    output: todo/generated/todo_docs.md
+  - name: devex
+    tag_match: ci
+    output: todo/generated/todo_ci.md
+
+

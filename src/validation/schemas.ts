@@ -126,7 +126,7 @@ export const ToolSchemas = {
   /** Tool execution request */
   execute: z.object({
     tool_name: z.string().min(1, 'Tool name is required'),
-    parameters: z.record(z.any()).default({}),
+    parameters: z.record(z.string(), z.any()).default({}),
     timeout: z.number().int().min(1000, 'Timeout must be at least 1 second')
       .max(300000, 'Timeout cannot exceed 5 minutes').default(30000)
   }),
@@ -252,7 +252,7 @@ export const VectorSchemas = {
     source_uuid: CommonSchemas.uuid,
     source: z.string().min(1),
     text: z.string().min(1),
-    metadata: z.record(z.any()).default({}),
+    metadata: z.record(z.string(), z.any()).default({}),
     created_at: CommonSchemas.timestamp,
     updated_at: CommonSchemas.timestamp
   }),
@@ -402,7 +402,7 @@ export const AudioSchemas = {
  */
 export const ResponseSchemas = {
   /** Success response schema */
-  success: <T>(dataSchema: z.ZodSchema<T>) => z.object({
+  success: <T>(dataSchema: z.ZodType<T>) => z.object({
     success: z.literal(true),
     data: dataSchema,
     message: z.string().optional(),
@@ -435,7 +435,7 @@ export const ResponseSchemas = {
 export const EnvironmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']).default('INFO'),
-  PORT: z.string().transform(Number).pipe(z.number().min(1).max(65535)).default('3000'),
+  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   APP_URL: CommonSchemas.url,
   API_KEY: z.string().min(1, 'API key is required'),
   JWT_SECRET: z.string().min(32, 'JWT secret must be at least 32 characters'),

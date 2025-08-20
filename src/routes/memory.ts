@@ -92,7 +92,7 @@ const memory = new Hono<AppEnv>()
         return c.json({
           success: false,
           error: 'Invalid request data',
-          details: error.errors
+          details: error.issues
         }, 400);
       }
 

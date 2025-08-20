@@ -3,9 +3,12 @@ import { transcription } from '../../../src/services/common/llm.service';
 
 const hasKey = (name: string) => !!process.env[name] && process.env[name]!.length > 0;
 
-describe('Smoke: Audio transcription (Whisper/OpenAI)', () => {
-  if (!hasKey('OPENAI_API_KEY')) {
-    test.skip('skipped – OPENAI_API_KEY not set', () => {});
+describe('Smoke: Audio transcription (Gemini or Whisper fallback)', () => {
+  const hasGoogle = hasKey('GOOGLE_API_KEY') || hasKey('GOOGLE_GENERATIVE_AI_API_KEY');
+  const hasOpenAI = hasKey('OPENAI_API_KEY');
+  const enabled = process.env.SMOKE_LLM === '1' && (hasGoogle || hasOpenAI);
+  if (!enabled) {
+    test.skip('skipped – set SMOKE_LLM=1 and GOOGLE_API_KEY or OPENAI_API_KEY to enable this smoke test', () => {});
     return;
   }
 

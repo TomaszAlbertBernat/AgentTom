@@ -73,7 +73,7 @@ Response:
 {
   "response": "The weather in New York is sunny with a temperature of 25°C.",
   "metadata": {
-    "model": "gpt-4o",
+    "model": "gemini-2.5-flash",
     "tokens": 150,
     "processing_time": 1.2
   }

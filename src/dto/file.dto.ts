@@ -10,7 +10,7 @@ export const FileUploadDto = z.object({
   ]),
   category: z.enum(['text', 'audio', 'image', 'document']),
   original_name: z.string(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   user: z.string()
 });
 
