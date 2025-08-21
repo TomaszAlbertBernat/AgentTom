@@ -4,6 +4,21 @@ Master task list for the AgentTom AI assistant project.
 
 ## 🎯 Current Priorities (P0)
 
+- [ ] BE-062: Create API key management system — user-provided keys for LLM and external services, avoid modyfing/removing .env file
+  `#backend #auth #config` `@est:6h` `@depends:BE-061` `@ac:secure storage and rotation of user API keys per service`
+
+- [ ] BE-064: Add simple setup wizard — first-run configuration for API keys and basic preferences  
+  `#backend #config` `@est:6h` `@depends:BE-062` `@ac:guided setup for essential API keys and tool configurations`
+
+- [ ] FE-042: Create setup wizard UI — friendly first-run experience for configuration  
+  `#frontend #config #ux` `@est:1d` `@depends:BE-064` `@ac:step-by-step UI for API key setup and basic configuration`
+
+- [ ] FE-041: Remove authentication UI for local mode — bypass login/register when running locally  
+  `#frontend #auth` `@est:4h` `@depends:BE-063` `@ac:direct access to chat/tools without login screen in local mode`
+
+- [ ] TEST-001: Verify and implement comprehensive testing strategy — audit existing tests and implement missing test types  
+  `#backend #frontend #testing #quality` `@est:2d` `@ac:smoke tests verified/implemented; unit tests coverage >80%; integration tests for API endpoints; system tests for key workflows; regression test suite established`
+
 - [x] BE-060: Design authentication-optional architecture — create user session without mandatory login  
   `#backend #auth` `@est:4h` `@ac:system works with anonymous local users; clear toggle for multi-user`
 
@@ -33,9 +48,6 @@ Master task list for the AgentTom AI assistant project.
 - [ ] FE-020: Playwright flows: auth, chat, tool execute, file upload, search  
   `#frontend #testing` `@est:1d` `@ac:5 green e2e specs in CI`
 
-- [ ] TEST-001: Verify and implement comprehensive testing strategy — audit existing tests and implement missing test types  
-  `#backend #frontend #testing #quality` `@est:2d` `@ac:smoke tests verified/implemented; unit tests coverage >80%; integration tests for API endpoints; system tests for key workflows; regression test suite established`
-
 - [ ] FE-023: Streaming chat endpoint + UI  
   `#frontend #chat` `@est:1d` `@ac:SSE renders token stream`
 
@@ -43,20 +55,9 @@ Master task list for the AgentTom AI assistant project.
   `#frontend #tools` `@est:1d` `@ac:3 tools auto-form`
 
 ### Auth and Local-First Enablement
-- [ ] BE-062: Create API key management system — user-provided keys for LLM and external services  
-  `#backend #auth #config` `@est:6h` `@depends:BE-061` `@ac:secure storage and rotation of user API keys per service`
-
-- [ ] BE-064: Add simple setup wizard — first-run configuration for API keys and basic preferences  
-  `#backend #config` `@est:6h` `@depends:BE-062` `@ac:guided setup for essential API keys and tool configurations`
-
-- [ ] FE-042: Create setup wizard UI — friendly first-run experience for configuration  
-  `#frontend #config #ux` `@est:1d` `@depends:BE-064` `@ac:step-by-step UI for API key setup and basic configuration`
 
 - [x] DOC-013: Update getting started guide — reflect new local-first approach  
   `#docs #config` `@est:2h` `@depends:BE-061` `@ac:clear instructions for both local and multi-user deployments`
-
-- [ ] FE-041: Remove authentication UI for local mode — bypass login/register when running locally  
-  `#frontend #auth` `@est:4h` `@depends:BE-063` `@ac:direct access to chat/tools without login screen in local mode`
 
 ## 📋 Backlog (P2)
 

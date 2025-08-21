@@ -1,17 +1,22 @@
 import { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
 import LogoutButton from '@/components/LogoutButton';
 import dynamic from 'next/dynamic';
+import { isAuthenticated, needsSetup } from '@/lib/auth/local-mode';
 
 const RateLimitBanner = dynamic(() => import('@/components/RateLimitBanner'), { ssr: false });
 
 export default async function ProtectedLayout({ children }: { children: ReactNode }) {
-  const store = await cookies();
-  const jwt = store.get('jwt')?.value;
-  if (!jwt) {
+  const auth = await isAuthenticated();
+  
+  if (!auth.authenticated) {
     redirect('/login');
+  }
+  
+  // If in local mode and setup is needed, redirect to setup
+  if (auth.isLocal && await needsSetup()) {
+    redirect('/setup');
   }
   return (
     <div className="min-h-screen flex">

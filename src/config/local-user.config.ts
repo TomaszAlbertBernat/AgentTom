@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
+import { encryptSensitiveData, decryptSensitiveData, maskApiKey } from '../utils/encryption';
 
 // Local user configuration schema
 const localUserSchema = z.object({
@@ -19,11 +20,13 @@ const localUserSchema = z.object({
     language: z.string().default('en'),
     timezone: z.string().default('Europe/Warsaw'),
     model: z.string().default('gemini-2.5-flash'),
+    setupCompleted: z.boolean().default(false),
   }).default(() => ({
     theme: 'system' as const,
     language: 'en',
     timezone: 'Europe/Warsaw',
     model: 'gemini-2.5-flash',
+    setupCompleted: false,
   })),
   apiKeys: z.object({
     google: z.string().optional(),
@@ -38,6 +41,17 @@ const localUserSchema = z.object({
       clientId: z.string().optional(),
       clientSecret: z.string().optional(),
     }).optional(),
+  }).default({}),
+  apiKeyMetadata: z.object({
+    google: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
+    openai: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
+    anthropic: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
+    xai: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
+    elevenlabs: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
+    resend: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
+    firecrawl: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
+    linear: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
+    spotify: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
   }).default({}),
   createdAt: z.date().default(() => new Date()),
   updatedAt: z.date().default(() => new Date()),
@@ -54,8 +68,10 @@ const defaultConfig: LocalUserConfig = {
     language: 'en',
     timezone: 'Europe/Warsaw',
     model: 'gemini-2.5-flash',
+    setupCompleted: false,
   },
   apiKeys: {},
+  apiKeyMetadata: {},
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -142,19 +158,58 @@ export const saveLocalUserConfig = (config: Partial<LocalUserConfig>): LocalUser
 };
 
 /**
- * Get API key for a specific service
+ * Get API key for a specific service (handles decryption)
  */
 export const getApiKey = (service: keyof LocalUserConfig['apiKeys']): string | undefined => {
   const config = loadLocalUserConfig();
-  return config.apiKeys[service] as string | undefined;
+  const encryptedKey = config.apiKeys[service] as string | undefined;
+  
+  if (!encryptedKey) return undefined;
+  
+  // If it looks like an encrypted key (base64), decrypt it
+  if (isEncryptedKey(encryptedKey)) {
+    try {
+      return decryptSensitiveData(encryptedKey, config.id);
+    } catch (error) {
+      console.error(`Failed to decrypt API key for ${service}:`, error);
+      return undefined;
+    }
+  }
+  
+  // For backward compatibility, return plaintext keys (they'll be encrypted on next save)
+  return encryptedKey;
 };
 
 /**
- * Set API key for a specific service
+ * Check if a string looks like an encrypted key
+ */
+function isEncryptedKey(key: string): boolean {
+  try {
+    // Encrypted keys are base64 and have minimum length
+    return key.length > 100 && /^[A-Za-z0-9+/]+=*$/.test(key);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Set API key for a specific service (with encryption)
  */
 export const setApiKey = (service: keyof LocalUserConfig['apiKeys'], key: string): void => {
   const config = loadLocalUserConfig();
-  config.apiKeys[service] = key;
+  
+  // Encrypt the API key
+  const encryptedKey = encryptSensitiveData(key, config.id);
+  config.apiKeys[service] = encryptedKey;
+  
+  // Update metadata
+  const now = new Date().toISOString();
+  if (!config.apiKeyMetadata[service]) {
+    config.apiKeyMetadata[service] = { createdAt: now };
+  } else {
+    config.apiKeyMetadata[service]!.lastRotated = now;
+  }
+  
   config.updatedAt = new Date();
   saveLocalUserConfig(config);
 };
@@ -207,3 +262,108 @@ export const getLocalUser = () => {
     isLocal: true,
   };
 };
+
+/**
+ * Delete API key for a specific service
+ */
+export const deleteApiKey = (service: keyof LocalUserConfig['apiKeys']): void => {
+  const config = loadLocalUserConfig();
+  delete config.apiKeys[service];
+  delete config.apiKeyMetadata[service];
+  config.updatedAt = new Date();
+  saveLocalUserConfig(config);
+};
+
+/**
+ * Get API key metadata (creation date, last rotation, etc.)
+ */
+export const getApiKeyMetadata = (service: keyof LocalUserConfig['apiKeys']) => {
+  const config = loadLocalUserConfig();
+  const metadata = config.apiKeyMetadata[service];
+  const hasKey = !!config.apiKeys[service];
+  
+  return {
+    hasKey,
+    masked: hasKey ? maskApiKey(getApiKey(service) || '') : null,
+    ...metadata,
+  };
+};
+
+/**
+ * List all configured API keys with their metadata
+ */
+export const listApiKeys = () => {
+  const config = loadLocalUserConfig();
+  const services = ['google', 'openai', 'anthropic', 'xai', 'elevenlabs', 'resend', 'firecrawl', 'linear', 'spotify'] as const;
+  
+  return services.reduce((acc, service) => {
+    const metadata = getApiKeyMetadata(service);
+    if (metadata.hasKey) {
+      acc[service] = metadata;
+    }
+    return acc;
+  }, {} as Record<string, any>);
+};
+
+/**
+ * Test if an API key is valid by attempting to use it
+ */
+export const testApiKey = async (service: keyof LocalUserConfig['apiKeys']): Promise<{ valid: boolean; error?: string }> => {
+  const apiKey = getApiKey(service);
+  if (!apiKey) {
+    return { valid: false, error: 'No API key configured' };
+  }
+
+  try {
+    // Test the API key based on service type
+    switch (service) {
+      case 'google':
+        return await testGoogleApiKey(apiKey);
+      case 'openai':
+        return await testOpenAIApiKey(apiKey);
+      default:
+        return { valid: true }; // For services without test endpoints
+    }
+  } catch (error) {
+    return { 
+      valid: false, 
+      error: error instanceof Error ? error.message : 'Test failed' 
+    };
+  }
+};
+
+/**
+ * Test Google API key
+ */
+async function testGoogleApiKey(apiKey: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (response.ok) {
+      return { valid: true };
+    } else {
+      return { valid: false, error: `HTTP ${response.status}: ${response.statusText}` };
+    }
+  } catch (error) {
+    return { valid: false, error: error instanceof Error ? error.message : 'Network error' };
+  }
+}
+
+/**
+ * Test OpenAI API key
+ */
+async function testOpenAIApiKey(apiKey: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const response = await fetch('https://api.openai.com/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+    });
+    if (response.ok) {
+      return { valid: true };
+    } else {
+      return { valid: false, error: `HTTP ${response.status}: ${response.statusText}` };
+    }
+  } catch (error) {
+    return { valid: false, error: error instanceof Error ? error.message : 'Network error' };
+  }
+}

@@ -1,11 +1,17 @@
 import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
+import { isAuthenticated, needsSetup } from '@/lib/auth/local-mode';
 
 export default async function Home() {
-  const store = await cookies();
-  const jwt = store.get('jwt')?.value;
-  if (!jwt) {
+  const auth = await isAuthenticated();
+  
+  if (!auth.authenticated) {
     redirect('/login');
   }
+  
+  // If in local mode and setup is needed, redirect to setup
+  if (auth.isLocal && await needsSetup()) {
+    redirect('/setup');
+  }
+  
   redirect('/(protected)');
 }

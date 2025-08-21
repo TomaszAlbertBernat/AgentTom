@@ -6,7 +6,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']).default('INFO'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  APP_URL: z.string().url().default('http://localhost:3000'),
+  APP_URL: z.string().default('http://localhost:3000'),
   API_KEY: z.string().min(1).optional(),
   JWT_SECRET: z.string().min(1).default('dev-secret'),
   APP_TIMEZONE: z.string().default('Europe/Warsaw'),
@@ -33,11 +33,11 @@ const envSchema = z.object({
   // Langfuse
   LANGFUSE_SECRET_KEY: z.string().optional(),
   LANGFUSE_PUBLIC_KEY: z.string().optional(),
-  LANGFUSE_BASEURL: z.string().url().optional(),
+  LANGFUSE_BASEURL: z.string().optional(),
 
   // Vector Database
   QDRANT_INDEX: z.string().optional(),
-  QDRANT_URL: z.string().url().optional(),
+  QDRANT_URL: z.string().optional(),
   QDRANT_API_KEY: z.string().optional(),
 
   // Search
@@ -48,7 +48,7 @@ const envSchema = z.object({
   // Google Services
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_REDIRECT_URI: z.string().url().optional(),
+  GOOGLE_REDIRECT_URI: z.string().optional(),
   GOOGLE_ACCESS_TOKEN: z.string().optional(),
   GOOGLE_REFRESH_TOKEN: z.string().optional(),
   GOOGLE_TOKEN_EXPIRY: z.string().optional(),
@@ -62,8 +62,8 @@ const envSchema = z.object({
   ELEVENLABS_API_KEY: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   SMS_PHONE_NUMBER: z.string().optional(),
-  FROM_EMAIL: z.string().email().optional(),
-  USER_EMAIL: z.string().email().optional(),
+  FROM_EMAIL: z.string().optional(),
+  USER_EMAIL: z.string().optional(),
 
   // Linear
   LINEAR_API_KEY: z.string().optional(),
@@ -124,28 +124,27 @@ export const validateEnv = (): EnvConfig => {
       if (nodeEnv !== 'development' && nodeEnv !== 'test') {
         process.exit(1);
       } else {
-        console.warn('Continuing in development despite env validation warnings.');
-        // Provide a best-effort config by merging defaults
-        return envSchema.parse({
+        console.warn('⚠️  Continuing in development despite env validation warnings.');
+        console.warn('💡  In local mode, you can configure API keys via the setup wizard at /setup');
+        
+        // Provide a best-effort config with safe defaults for local mode
+        const devConfig = {
+          ...process.env,
           NODE_ENV: nodeEnv,
           LOG_LEVEL: process.env.LOG_LEVEL || 'INFO',
           PORT: process.env.PORT || '3000',
           APP_URL: process.env.APP_URL || 'http://localhost:3000',
-          API_KEY: process.env.API_KEY,
           JWT_SECRET: process.env.JWT_SECRET || 'dev-secret',
           APP_TIMEZONE: process.env.APP_TIMEZONE || 'Europe/Warsaw',
           DISABLE_API_KEY: process.env.DISABLE_API_KEY || 'true',
           AUTH_MODE: process.env.AUTH_MODE || 'local',
-          OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'test-openai-key',
-          GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
-          IMAGE_PROVIDER: process.env.IMAGE_PROVIDER,
-          VERTEX_PROJECT_ID: process.env.VERTEX_PROJECT_ID,
-          VERTEX_LOCATION: process.env.VERTEX_LOCATION,
           DEFAULT_LLM_PROVIDER: process.env.DEFAULT_LLM_PROVIDER || 'google',
-          // NOTE: Never use 'gemini-2.0-flash'.
           DEFAULT_TEXT_MODEL: process.env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash',
           FALLBACK_TEXT_MODEL: process.env.FALLBACK_TEXT_MODEL || 'gpt-4o-mini',
-        });
+        };
+        
+        // Parse with the safe config - this should not throw
+        return envSchema.parse(devConfig);
       }
     }
     throw error;

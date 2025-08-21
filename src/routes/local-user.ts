@@ -7,7 +7,19 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { loadLocalUserConfig, saveLocalUserConfig, getApiKey, setApiKey, getUserPreferences, updateUserPreferences, getLocalUser } from '../config/local-user.config';
+import { 
+  loadLocalUserConfig, 
+  saveLocalUserConfig, 
+  getApiKey, 
+  setApiKey, 
+  deleteApiKey,
+  getUserPreferences, 
+  updateUserPreferences, 
+  getLocalUser,
+  listApiKeys,
+  getApiKeyMetadata,
+  testApiKey
+} from '../config/local-user.config';
 import { AppEnv } from '../types/hono';
 
 const localUser = new Hono<AppEnv>();
@@ -74,17 +86,10 @@ localUser.patch('/preferences', zValidator('json', updatePreferencesSchema), asy
   return c.json(updated.preferences);
 });
 
-// Get available API keys (without values)
+// Get available API keys with metadata (without actual key values)
 localUser.get('/api-keys', async (c) => {
-  const config = loadLocalUserConfig();
-  const availableKeys = Object.keys(config.apiKeys).reduce((acc, key) => {
-    if (config.apiKeys[key as keyof typeof config.apiKeys]) {
-      acc[key] = true;
-    }
-    return acc;
-  }, {} as Record<string, boolean>);
-
-  return c.json(availableKeys);
+  const keys = listApiKeys();
+  return c.json(keys);
 });
 
 // Set API key for a service
@@ -109,9 +114,7 @@ localUser.delete('/api-keys/:service', async (c) => {
   const service = c.req.param('service') as keyof ReturnType<typeof loadLocalUserConfig>['apiKeys'];
 
   try {
-    const config = loadLocalUserConfig();
-    delete config.apiKeys[service];
-    saveLocalUserConfig(config);
+    deleteApiKey(service);
     return c.json({ success: true, service });
   } catch (error) {
     return c.json({ error: 'Failed to delete API key' }, 500);
@@ -134,6 +137,33 @@ localUser.post('/api-keys/spotify', zValidator('json', setSpotifyKeysSchema), as
     return c.json({ success: true, service: 'spotify' });
   } catch (error) {
     return c.json({ error: 'Failed to save Spotify API keys' }, 500);
+  }
+});
+
+// Test API key for a service
+localUser.post('/api-keys/:service/test', async (c) => {
+  const service = c.req.param('service') as keyof ReturnType<typeof loadLocalUserConfig>['apiKeys'];
+
+  try {
+    const result = await testApiKey(service);
+    return c.json(result);
+  } catch (error) {
+    return c.json({ 
+      valid: false, 
+      error: error instanceof Error ? error.message : 'Test failed' 
+    }, 500);
+  }
+});
+
+// Get metadata for a specific API key
+localUser.get('/api-keys/:service/metadata', async (c) => {
+  const service = c.req.param('service') as keyof ReturnType<typeof loadLocalUserConfig>['apiKeys'];
+
+  try {
+    const metadata = getApiKeyMetadata(service);
+    return c.json(metadata);
+  } catch (error) {
+    return c.json({ error: 'Failed to get API key metadata' }, 500);
   }
 });
 

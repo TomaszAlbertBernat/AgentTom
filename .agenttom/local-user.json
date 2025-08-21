@@ -1,15 +1,22 @@
 {
-  "id": "047b9f1f-c68b-43c7-9070-d3c4c3f40880",
+  "id": "3512c39f-f3b2-47d9-8ef4-080260112924",
   "name": "Local User",
   "preferences": {
     "theme": "system",
     "language": "en",
     "timezone": "Europe/Warsaw",
-    "model": "gemini-2.5-flash"
+    "model": "gemini-2.5-flash",
+    "setupCompleted": false
   },
   "apiKeys": {
-    "google": "test-google-key"
+    "google": "Lr+tlSpCQTaI/JWP11SzPoXB715RFmONWTaIZPCT7QSjovVwOxU0bmlso643r6XNq4Yw2Zdl7xlfybb9WRuAbaHZxuenCic6EjUetHr1lYEXSk3aj1c="
   },
-  "createdAt": "2025-08-21T16:22:26.620Z",
-  "updatedAt": "2025-08-21T16:23:19.254Z"
+  "apiKeyMetadata": {
+    "google": {
+      "createdAt": "2025-08-21T17:58:24.473Z",
+      "lastRotated": "2025-08-21T17:58:24.719Z"
+    }
+  },
+  "createdAt": "2025-08-21T17:58:24.319Z",
+  "updatedAt": "2025-08-21T17:58:24.729Z"
 }
