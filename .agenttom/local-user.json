@@ -1,0 +1,15 @@
+{
+  "id": "047b9f1f-c68b-43c7-9070-d3c4c3f40880",
+  "name": "Local User",
+  "preferences": {
+    "theme": "system",
+    "language": "en",
+    "timezone": "Europe/Warsaw",
+    "model": "gemini-2.5-flash"
+  },
+  "apiKeys": {
+    "google": "test-google-key"
+  },
+  "createdAt": "2025-08-21T16:22:26.620Z",
+  "updatedAt": "2025-08-21T16:23:19.254Z"
+}

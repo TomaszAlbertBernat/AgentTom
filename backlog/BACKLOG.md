@@ -4,14 +4,19 @@ Master task list for the AgentTom AI assistant project.
 
 ## 🎯 Current Priorities (P0)
 
-- [ ] BE-001: Implement `/api/login` — validate credentials, issue JWT  
-  `#backend #auth` `@est:4h` `@ac:returns 200 + token; invalid creds 401; rate-limited returns 429`
+- [x] BE-060: Design authentication-optional architecture — create user session without mandatory login  
+  `#backend #auth` `@est:4h` `@ac:system works with anonymous local users; clear toggle for multi-user`
 
-- [ ] BE-004: Finalize `docs/GETTING_STARTED.md` (auth notes, port, envs)  
-  `#backend #docs #auth` `@est:1h` `@ac:doc matches current envs and routes`
+- [x] BE-063: Remove database auth requirements — make user table optional, default to local mode  
+  `#backend #auth #database` `@est:4h` `@depends:BE-060` `@ac:app runs without registration/login in local mode`
 
-- [ ] FE-002: Login page — validations, call `/api/login`, handle errors  
-  `#frontend #auth` `@est:6h` `@depends:BE-001` `@ac:success routes to dashboard; invalid shows inline errors`
+- [x] BE-065: Update middleware for optional auth — detect local vs authenticated modes  
+  `#backend #auth #middleware` `@est:4h` `@depends:BE-063` `@ac:transparent handling for both modes`
+
+- [x] BE-061: Implement local user configuration — file-based user config for API keys and preferences  
+  `#backend #auth #config` `@est:6h` `@depends:BE-060` `@ac:reads local config; creates default on first run`
+
+
 
 ## 🚀 Ready to Start (P1)
 
@@ -28,11 +33,30 @@ Master task list for the AgentTom AI assistant project.
 - [ ] FE-020: Playwright flows: auth, chat, tool execute, file upload, search  
   `#frontend #testing` `@est:1d` `@ac:5 green e2e specs in CI`
 
+- [ ] TEST-001: Verify and implement comprehensive testing strategy — audit existing tests and implement missing test types  
+  `#backend #frontend #testing #quality` `@est:2d` `@ac:smoke tests verified/implemented; unit tests coverage >80%; integration tests for API endpoints; system tests for key workflows; regression test suite established`
+
 - [ ] FE-023: Streaming chat endpoint + UI  
   `#frontend #chat` `@est:1d` `@ac:SSE renders token stream`
 
 - [ ] FE-024: Schema-driven tool forms using backend schemas (Zod)  
   `#frontend #tools` `@est:1d` `@ac:3 tools auto-form`
+
+### Auth and Local-First Enablement
+- [ ] BE-062: Create API key management system — user-provided keys for LLM and external services  
+  `#backend #auth #config` `@est:6h` `@depends:BE-061` `@ac:secure storage and rotation of user API keys per service`
+
+- [ ] BE-064: Add simple setup wizard — first-run configuration for API keys and basic preferences  
+  `#backend #config` `@est:6h` `@depends:BE-062` `@ac:guided setup for essential API keys and tool configurations`
+
+- [ ] FE-042: Create setup wizard UI — friendly first-run experience for configuration  
+  `#frontend #config #ux` `@est:1d` `@depends:BE-064` `@ac:step-by-step UI for API key setup and basic configuration`
+
+- [x] DOC-013: Update getting started guide — reflect new local-first approach  
+  `#docs #config` `@est:2h` `@depends:BE-061` `@ac:clear instructions for both local and multi-user deployments`
+
+- [ ] FE-041: Remove authentication UI for local mode — bypass login/register when running locally  
+  `#frontend #auth` `@est:4h` `@depends:BE-063` `@ac:direct access to chat/tools without login screen in local mode`
 
 ## 📋 Backlog (P2)
 
@@ -66,38 +90,10 @@ Master task list for the AgentTom AI assistant project.
 ### Epic: Simplified Authentication & Local-First Experience  
 *User Story: "As a developer I need this app to use simple authentication if any. I want AgentTom to just work when i run it, no authentications needed. User should provide their own api keys."*
 
-- [ ] BE-060: Design authentication-optional architecture — create user session without mandatory login  
-  `#backend #auth` `@est:4h` `@ac:system works with anonymous users, optional auth for multi-user setups`
-
-- [ ] BE-061: Implement local user configuration — file-based user config for API keys and preferences  
-  `#backend #auth #config` `@est:6h` `@depends:BE-060` `@ac:reads config from local file, creates default user on first run`
-
-- [ ] BE-062: Create API key management system — user-provided keys for LLM and external services  
-  `#backend #auth #config` `@est:6h` `@depends:BE-061` `@ac:secure storage and rotation of user API keys per service`
-
-- [ ] BE-063: Remove database auth requirements — make user table optional, default to local mode  
-  `#backend #auth #database` `@est:4h` `@depends:BE-061` `@ac:app runs without user registration/login when in local mode`
-
-- [ ] BE-064: Add simple setup wizard — first-run configuration for API keys and basic preferences  
-  `#backend #config` `@est:6h` `@depends:BE-062` `@ac:guided setup for essential API keys and tool configurations`
-
-- [ ] FE-041: Remove authentication UI for local mode — bypass login/register when running locally  
-  `#frontend #auth` `@est:4h` `@depends:BE-063` `@ac:direct access to chat/tools without login screen in local mode`
-
-- [ ] FE-042: Create setup wizard UI — friendly first-run experience for configuration  
-  `#frontend #config #ux` `@est:1d` `@depends:BE-064` `@ac:step-by-step UI for API key setup and basic configuration`
-
-- [ ] BE-065: Update middleware for optional auth — detect local vs authenticated modes  
-  `#backend #auth #middleware` `@est:4h` `@depends:BE-063` `@ac:middleware handles both auth modes transparently`
-
-- [ ] DOC-011: Update getting started guide — reflect new local-first approach  
-  `#docs #config` `@est:2h` `@depends:BE-064,FE-042` `@ac:clear instructions for both local and multi-user deployments`
-
 - [ ] BE-066: Migration script for existing users — preserve data when switching to local mode  
   `#backend #migration #config` `@est:4h` `@depends:BE-063` `@ac:existing installations can switch to local mode without data loss`
 
-- [ ] BE-067: Remove unnecessary authentication for local deployment — eliminate auth barriers since local PC users control access  
-  `#backend #auth #config` `@est:6h` `@ac:app runs without any authentication requirements in local mode, direct access to all features`
+Note: Core tasks for this epic are now prioritized in P0/P1 above (BE-060, BE-061, BE-062, BE-063, BE-064, BE-065, FE-041, FE-042, DOC-011). BE-067 was merged into BE-063/BE-065 to remove duplication.
 
 ### Technical Review & Architecture
 
@@ -115,10 +111,19 @@ Master task list for the AgentTom AI assistant project.
 - [ ] FE-022: CI check for OpenAPI codegen drift  
   `#frontend #ci` `@est:2h` `@ac:pipeline fails if drift`
 
+- [ ] FE-002: Finalize login experience for multi-user mode — validations, call `/api/auth/login`, persist JWT and attach to API client  
+  `#frontend #auth` `@est:6h` `@depends:BE-060` `@ac:JWT stored; authorized requests; clear error states`
+
 - [ ] AI-101: Preprocess chit-chat dataset — dedupe, normalize  
   `#ai #ml` `@est:3h` `@ac:dataset summary, saved artifacts`
 
 ## ✅ Completed
+
+- [x] BE-001: Implement `/api/auth/login` — validate credentials, issue JWT, rate-limited  
+  `#backend #auth` `@ac:200 + token; invalid creds 401; rate-limited 429`
+
+- [x] BE-004: Finalize `docs/GETTING_STARTED.md` (auth notes, port, envs)  
+  `#backend #docs #auth`
 
 - [x] BE-002: Keep DALL·E image generation; Imagen 3 deferred `#backend #llm`
 - [x] BE-003: Transcription default Gemini; Whisper fallback `#backend #llm`

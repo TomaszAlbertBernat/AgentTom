@@ -8,6 +8,10 @@ Quick setup guide to get AgentTom running locally.
 - Node.js 20.x or later
 - At least one AI provider API key
 
+## 🏠 Local-First Mode (Recommended)
+
+AgentTom runs in **local mode** by default - no authentication required! Just provide your own API keys and start using it immediately.
+
 ## 🚀 Quick Setup
 
 ### 1. Install
@@ -17,7 +21,21 @@ cd AgentTom
 bun install
 ```
 
-### 2. Environment Setup
+### 2. Environment Setup (Optional)
+
+For local mode, you can either:
+1. **Use the built-in configuration UI** (recommended)
+2. Set environment variables (optional)
+
+#### Option A: Built-in Configuration (Recommended)
+No `.env` file needed! Start the server and configure via the UI:
+
+```bash
+bun run dev
+# Open http://localhost:3000/api/local-user/config
+```
+
+#### Option B: Environment Variables (Optional)
 ```bash
 cp .env-example .env
 ```
@@ -25,49 +43,82 @@ cp .env-example .env
 Edit `.env` with your configuration:
 
 ```bash
-# Required - At least one AI provider
+# Optional - At least one AI provider
 GOOGLE_API_KEY=your_google_ai_studio_key
 # OR
 OPENAI_API_KEY=sk-your_openai_key
 
-# Required - Basic config
+# Optional - Basic config
 APP_URL=http://localhost:3000
 PORT=3000
+
+# Only needed for multi-user mode
+AUTH_MODE=multiuser  # Set to enable multi-user authentication
 JWT_SECRET=your-random-secret-here
 API_KEY=your-api-key-here
 ```
 
-### 3. Database Setup
-```bash
-bun run generate  # Generate migrations
-bun run migrate   # Create database
-bun run seed      # Add sample data (optional)
-```
-
-### 4. Start Development Server
+### 3. Start the Server
 ```bash
 bun run dev
 ```
 
-The server starts at `http://localhost:3000`.
+The server starts at `http://localhost:3000` in **local mode** by default.
 
 **Test it works:**
 ```bash
-curl http://localhost:3000/api/web/health
+curl http://localhost:3000/health
 # Should return: {"status":"ok"}
 ```
 
 ## 🔑 API Keys Setup
 
-### Google AI Studio (Recommended)
+### Local Mode Configuration (Recommended)
+
+Configure your API keys through the built-in interface:
+
+1. **Start the server** (no env setup needed):
+   ```bash
+   bun run dev
+   ```
+
+2. **Configure API keys via API**:
+   ```bash
+   # Add Google API key
+   curl -X POST http://localhost:3000/api/local-user/api-keys \
+     -H "Content-Type: application/json" \
+     -d '{"service":"google","key":"YOUR_GOOGLE_AI_STUDIO_KEY"}'
+
+   # Add OpenAI API key
+   curl -X POST http://localhost:3000/api/local-user/api-keys \
+     -H "Content-Type: application/json" \
+     -d '{"service":"openai","key":"YOUR_OPENAI_KEY"}'
+   ```
+
+3. **Check configured keys**:
+   ```bash
+   curl http://localhost:3000/api/local-user/api-keys
+   # Returns: {"google":true,"openai":true}
+   ```
+
+### Getting API Keys
+
+#### Google AI Studio (Recommended)
 1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
 2. Create API key
-3. Add to `.env`: `GOOGLE_API_KEY=AI...`
+3. Use the local configuration API above
 
-### OpenAI (Fallback)
+#### OpenAI (Fallback)
 1. Go to [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Create API key
-3. Add to `.env`: `OPENAI_API_KEY=sk-...`
+3. Use the local configuration API above
+
+### Environment Variables (Alternative)
+You can still use environment variables if preferred:
+```bash
+GOOGLE_API_KEY=your_google_ai_studio_key
+OPENAI_API_KEY=sk-your_openai_key
+```
 
 ## 🛠️ Optional Services
 
@@ -103,35 +154,44 @@ REDIS_URL=redis://localhost:6379
 
 ## 🧪 Testing Your Setup
 
-### 1. Check Health
+### 1. Check Service Status
 ```bash
 curl http://localhost:3000/api/web/health/details
 ```
 
-This shows which services are configured.
+This shows which services are configured and your auth mode.
 
-### 2. Create User Account
+### 2. Test Local User
 ```bash
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123","name":"Test User"}'
+# Check your local user info
+curl http://localhost:3000/api/local-user/me
+
+# Check your configuration
+curl http://localhost:3000/api/local-user/config
 ```
 
-Save the returned JWT token.
-
-### 3. Test Chat
+### 3. Test API Access (No Authentication Required!)
 ```bash
-curl -X POST http://localhost:3000/api/agi/conversations \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+# Test web scraping
+curl -X POST http://localhost:3000/api/web/get-contents \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com"}'
+
+# Test tools list
+curl http://localhost:3000/api/tools/list
 ```
 
-Get the conversation ID, then:
-
+### 4. Test Chat (Once API Keys Are Configured)
 ```bash
-curl -X POST http://localhost:3000/api/agi/messages \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+# Create a conversation
+curl -X POST http://localhost:3000/api/conversations \
   -H "Content-Type: application/json" \
-  -d '{"content":"Hello!","conversation_id":"CONVERSATION_ID"}'
+  -d '{}'
+
+# Send a message (replace CONVERSATION_ID)
+curl -X POST http://localhost:3000/api/agi/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Hello! How are you?","conversation_id":"CONVERSATION_ID"}'
 ```
 
 ## 🔧 Development Commands
@@ -164,33 +224,48 @@ BACKEND_API_KEY=your-api-key-from-backend-env
 
 ## 🔒 Security Notes
 
-### Development Mode
-- API key checks disabled by default (`DISABLE_API_KEY=true`)
-- CORS is permissive
-- Use JWT tokens for authentication
+### Local Mode (Default)
+- No authentication required
+- Configure API keys via local config file (`.agenttom/local-user.json`)
+- Single user experience
+- CORS is permissive for local development
 
-### Production Mode
-Set these for production:
+### Multi-User Mode
+Set `AUTH_MODE=multiuser` to enable authentication:
 ```bash
+AUTH_MODE=multiuser
 NODE_ENV=production
-DISABLE_API_KEY=false
-CORS_ORIGIN=https://yourdomain.com
 JWT_SECRET=strong-random-string
 API_KEY=secure-api-key
+CORS_ORIGIN=https://yourdomain.com
+```
+
+### Database Setup (Only for Multi-User Mode)
+```bash
+bun run generate  # Generate migrations
+bun run migrate   # Create database
+bun run seed      # Add sample data (optional)
 ```
 
 ## 🚨 Troubleshooting
 
 ### Common Issues
 
-**Database issues:**
+**Local config issues:**
+```bash
+# Reset local configuration
+rm -rf .agenttom/
+# Restart the server to recreate defaults
+```
+
+**Database issues (multi-user mode only):**
 ```bash
 rm agi.db
 bun run generate && bun run migrate
 ```
 
-**Missing environment variables:**
-Check the startup logs - they'll tell you what's missing.
+**Missing API keys:**
+Check the startup logs or visit `http://localhost:3000/api/local-user/config` to see your configuration.
 
 **Port already in use:**
 ```bash
@@ -226,4 +301,12 @@ Visit `http://localhost:3000/api/web/health/details` to see configured services.
 
 ---
 
-**Important:** Make sure at least one AI provider (Google or OpenAI) is configured before expecting chat functionality to work.
+## 🎯 Key Features of Local Mode
+
+- **No signup required** - Start using immediately
+- **Your API keys, your data** - All configuration stored locally
+- **Simple setup** - Just run `bun run dev` and start configuring
+- **Privacy-focused** - No external authentication or user tracking
+- **Full feature access** - All tools and capabilities available
+
+**Important:** Configure at least one AI provider (Google or OpenAI) API key for chat functionality to work.

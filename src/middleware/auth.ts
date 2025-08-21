@@ -10,6 +10,7 @@ import {providers} from '../config/llm.config';
 import {apiKeyService} from '../services/common/api-key.service';
 import { env } from '../config/env.config';
 import jwt from 'jsonwebtoken';
+import { isLocalMode, getLocalUser } from '../config/local-user.config';
 
 // Paths that don't require authentication
 const PUBLIC_PATHS = [
@@ -17,7 +18,8 @@ const PUBLIC_PATHS = [
   /^\/api\/auth\/(register|login|me)$/,
   /^\/api\/auth\/api-keys$/,
   /^\/(api\/auth|api\/files|api\/file)\/[0-9a-f-]+$/i,
-  /^\/api\/auth\/spotify\/(?:callback|authorize)/
+  /^\/api\/auth\/spotify\/(?:callback|authorize)/,
+  /^\/api\/local-user(?:\/.*)?$/
 ];
 
 /**
@@ -31,6 +33,45 @@ export const authMiddleware = () => {
       return next();
     }
 
+    // Handle local mode - create anonymous user session
+    if (isLocalMode()) {
+      const localUser = getLocalUser();
+      const userId = localUser.uuid;
+      const scopes = localUser.scopes;
+
+      // Set up request context for local user
+      const content_type = c.req.header('Content-Type') || '';
+      const is_multipart = content_type.includes('multipart/form-data');
+      const request_body: Record<string, unknown> = {};
+
+      const supported_models = Object.values(providers)
+        .flatMap(provider => Object.keys(provider));
+      const configured_default = env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash';
+      const default_model = configured_default === 'gemini-2.0-flash' ? 'gemini-2.5-flash' : configured_default;
+      const requested_model = is_multipart ? default_model : (request_body as any).model;
+      const validated_model = supported_models.includes(requested_model) ? requested_model : default_model;
+
+      if (requested_model && requested_model !== validated_model) {
+        c.set('warning', `Invalid model '${requested_model}' requested. Using '${default_model}' instead.`);
+      }
+
+      // Set request context with local user information
+      c.set('request', {
+        ...request_body,
+        user: {
+          id: userId,
+          uuid: userId,
+          scopes,
+          isLocal: true,
+        },
+        model: validated_model,
+        conversation_id: is_multipart ? uuidv4() : ((request_body as any).conversation_id || uuidv4())
+      });
+
+      return next();
+    }
+
+    // Multi-user mode - proceed with existing authentication logic
     const authorization = c.req.header('Authorization') || c.req.header('authorization');
     const xApiKey = c.req.header('X-API-Key') || c.req.header('x-api-key');
     const xJwt = c.req.header('X-JWT') || c.req.header('x-jwt');

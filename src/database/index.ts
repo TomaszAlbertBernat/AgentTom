@@ -3,6 +3,7 @@ import { createClient } from '@libsql/client';
 import * as schema from '../schema';
 import { drizzle as drizzleSqlite } from 'drizzle-orm/bun-sqlite';
 import { Database } from 'bun:sqlite';
+import { isLocalMode } from '../config/local-user.config';
 
 // Initialize libSQL client
 const client = createClient({

@@ -12,9 +12,133 @@ import type {User} from '../../schema/user';
 import { logger } from './logger.service';
 import { cacheService } from './cache.service';
 import { measureQueryTime } from '../../database/query-utils';
+import { isLocalMode, getLocalUser } from '../../config/local-user.config';
 
 /** Component logger for user service operations */
 const userLogger = logger.child('USER_SERVICE');
+
+/**
+ * Helper function to safely execute database operations in local mode
+ * @param operation - Database operation to execute
+ * @param fallback - Fallback value if operation fails or in local mode
+ * @returns Result of operation or fallback value
+ */
+async function safeDbOperation<T>(operation: () => Promise<T>, fallback: T): Promise<T> {
+  if (isLocalMode()) {
+    userLogger.debug('Local mode: Skipping database operation');
+    return fallback;
+  }
+
+  try {
+    return await operation();
+  } catch (error) {
+    userLogger.warn('Database operation failed, using fallback', error as Error);
+    return fallback;
+  }
+}
+
+/**
+ * Get user by UUID with local mode support
+ * @param uuid - User UUID to search for
+ * @returns User object or local user if in local mode
+ */
+export async function getUserByUUID(uuid: string): Promise<User | undefined> {
+  if (isLocalMode()) {
+    const localUser = getLocalUser();
+    // If the UUID matches local user, return it
+    if (localUser.uuid === uuid) {
+      return localUser as User;
+    }
+    return undefined;
+  }
+
+  return await findByUUID(uuid);
+}
+
+/**
+ * Get user by token with local mode support
+ * @param token - Authentication token to search for
+ * @returns User object or undefined
+ */
+export async function getUserByToken(token: string): Promise<User | undefined> {
+  if (isLocalMode()) {
+    // In local mode, we don't use tokens, return undefined
+    userLogger.debug('Local mode: Token authentication not supported');
+    return undefined;
+  }
+
+  return await findByToken(token);
+}
+
+/**
+ * Update Spotify tokens with local mode support
+ * @param user_uuid - User UUID
+ * @param access_token - Spotify access token
+ * @param refresh_token - Spotify refresh token
+ * @param expires_in - Token expiration time in seconds
+ */
+export async function safeUpdateSpotifyTokens(
+  user_uuid: string,
+  access_token: string,
+  refresh_token: string,
+  expires_in: number
+): Promise<void> {
+  return await safeDbOperation(
+    () => updateSpotifyTokens(user_uuid, access_token, refresh_token, expires_in),
+    undefined
+  );
+}
+
+/**
+ * Get Spotify tokens with local mode support
+ * @param user_uuid - User UUID
+ * @returns Spotify tokens or undefined
+ */
+export async function safeGetSpotifyTokens(user_uuid: string): Promise<{
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: Date;
+} | undefined> {
+  return await safeDbOperation(
+    () => getSpotifyTokens(user_uuid),
+    undefined
+  );
+}
+
+/**
+ * Update Google tokens with local mode support
+ * @param user_uuid - User UUID
+ * @param access_token - Google access token
+ * @param refresh_token - Google refresh token
+ * @param expires_in - Token expiration time in seconds
+ */
+export async function safeUpdateGoogleTokens(
+  user_uuid: string,
+  access_token: string,
+  refresh_token: string,
+  expires_in: number
+): Promise<void> {
+  return await safeDbOperation(
+    () => updateGoogleTokens(user_uuid, access_token, refresh_token, expires_in),
+    undefined
+  );
+}
+
+/**
+ * Get Google tokens with local mode support
+ * @param user_uuid - User UUID
+ * @returns Google tokens or undefined
+ */
+export async function safeGetGoogleTokens(user_uuid: string): Promise<{
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: Date;
+} | undefined> {
+  return await safeDbOperation(
+    () => getGoogleTokens(user_uuid),
+    undefined
+  );
+}
 
 /** Cache keys for user-related data */
 const CACHE_KEYS = {

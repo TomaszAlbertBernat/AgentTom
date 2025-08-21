@@ -12,6 +12,26 @@ import {tempFile} from './upload.service';
 import { ValidationError } from '../../utils/errors';
 import {providers} from '../../config/llm.config';
 import { env } from '../../config/env.config';
+import { isLocalMode, getApiKey } from '../../config/local-user.config';
+
+/**
+ * Get API key for a service, checking local user config first if in local mode
+ * @param envKey - Environment variable name
+ * @param localKey - Local user config key
+ * @returns API key or undefined
+ */
+const getApiKeyForService = (envKey: string, localKey: string): string | undefined => {
+  // In local mode, prefer local user config
+  if (isLocalMode()) {
+    const localApiKey = getApiKey(localKey as any);
+    if (localApiKey) {
+      return localApiKey;
+    }
+  }
+
+  // Fall back to environment variable
+  return process.env[envKey];
+};
 
 // Lightweight indirection layer to make AI SDK calls testable without network I/O
 type AiOps = {
@@ -105,15 +125,25 @@ const createBaseConfig = ({model = resolveDefaultModel(), messages, temperature 
   // Return the actual LanguageModelV1 object based on provider
   let languageModel;
   if (provider === 'openai') {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new ValidationError('OPENAI_API_KEY is not set. Provide a valid key or choose a model from a configured provider.');
+    const openaiKey = getApiKeyForService('OPENAI_API_KEY', 'openai');
+    if (!openaiKey) {
+      throw new ValidationError('OpenAI API key not configured', {
+        suggestion: isLocalMode()
+          ? 'Configure OpenAI API key via local user settings or set OPENAI_API_KEY environment variable'
+          : 'Set OPENAI_API_KEY environment variable'
+      });
     }
     languageModel = openai(model);
   } else if (provider === 'anthropic') {
     languageModel = anthropic(model);
   } else if (provider === 'google') {
-    if (!process.env.GOOGLE_API_KEY) {
-      throw new ValidationError('GOOGLE_API_KEY is not set. Provide a valid key or choose a different model.');
+    const googleKey = getApiKeyForService('GOOGLE_API_KEY', 'google');
+    if (!googleKey) {
+      throw new ValidationError('Google API key not configured', {
+        suggestion: isLocalMode()
+          ? 'Configure Google API key via local user settings or set GOOGLE_API_KEY environment variable'
+          : 'Set GOOGLE_API_KEY environment variable'
+      });
     }
     languageModel = google(model);
   } else {
@@ -386,7 +416,8 @@ export const embedding = async (text: string) => {
     return embedding;
   } catch (error) {
     // Fallback to OpenAI embeddings if available
-    if (process.env.OPENAI_API_KEY) {
+    const openaiKey = getApiKeyForService('OPENAI_API_KEY', 'openai');
+    if (openaiKey) {
       const {embedding} = await aiOps.embed({
         model: openai.embedding('text-embedding-3-large'),
         value: text
@@ -500,8 +531,12 @@ interface TranscriptionResult {
 let openai_client_instance: OpenAI | null = null;
 function getOpenAIClient(): OpenAI {
   if (!openai_client_instance) {
+    const openaiKey = getApiKeyForService('OPENAI_API_KEY', 'openai');
+    if (!openaiKey) {
+      throw new ValidationError('OpenAI API key not configured');
+    }
     openai_client_instance = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
+      apiKey: openaiKey
     });
   }
   return openai_client_instance;
@@ -561,11 +596,13 @@ export const transcription = {
     config: TranscriptionConfig = { language: 'en' }
   ): Promise<string> => {
     // Prefer Gemini audio transcription when available; fall back to Whisper
-    const useGoogle = !!(process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+    const googleKey = getApiKeyForService('GOOGLE_API_KEY', 'google') ||
+                     process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const useGoogle = !!googleKey;
 
     // Helper to try Gemini transcription with a specific mime
     const tryGemini = async (mimeType: string): Promise<string> => {
-      const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY;
+      const apiKey = googleKey;
       if (!apiKey) throw new Error('Missing Google API key');
       const genAI = new GoogleGenerativeAI(apiKey);
       // Use a multimodal-capable Gemini model for audio; avoid 2.0 models explicitly

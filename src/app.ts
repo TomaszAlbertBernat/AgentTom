@@ -31,6 +31,7 @@ import memory from './routes/memory';
 import text from './routes/text';
 import web from './routes/web';
 import media from './routes/spotify';
+import { localUserRoutes } from './routes/local-user';
 
 // Create Hono app
 const app = new Hono();
@@ -127,5 +128,6 @@ app.route('/api/memory', memory);
 app.route('/api/text', text);
 app.route('/api/web', web);
 app.route('/api/spotify', media);
+app.route('/api/local-user', localUserRoutes);
 
 export { app }; 

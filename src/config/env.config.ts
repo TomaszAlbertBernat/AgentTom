@@ -12,6 +12,9 @@ const envSchema = z.object({
   APP_TIMEZONE: z.string().default('Europe/Warsaw'),
   DISABLE_API_KEY: z.enum(['true', 'false']).default((process.env.NODE_ENV || 'development') === 'production' ? 'false' : 'true'),
 
+  // Authentication mode
+  AUTH_MODE: z.enum(['local', 'multiuser']).default('local'),
+
   // AI Providers
   OPENAI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -132,6 +135,7 @@ export const validateEnv = (): EnvConfig => {
           JWT_SECRET: process.env.JWT_SECRET || 'dev-secret',
           APP_TIMEZONE: process.env.APP_TIMEZONE || 'Europe/Warsaw',
           DISABLE_API_KEY: process.env.DISABLE_API_KEY || 'true',
+          AUTH_MODE: process.env.AUTH_MODE || 'local',
           OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'test-openai-key',
           GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
           IMAGE_PROVIDER: process.env.IMAGE_PROVIDER,
@@ -177,6 +181,8 @@ export const isServiceEnabled = {
 // Log service availability on startup
 export const logServiceStatus = () => {
   console.log('\n🔧 Service Configuration Status:');
+  console.log('================================');
+  console.log(`🎯 Auth Mode: ${env.AUTH_MODE === 'local' ? 'LOCAL (single-user)' : 'MULTI-USER'}`);
   console.log('================================');
   
   const services = [
