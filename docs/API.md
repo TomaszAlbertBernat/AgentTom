@@ -1,37 +1,16 @@
 # API Reference
 
-This document provides detailed information about the AliceAGI API endpoints.
+Quick reference for AgentTom API endpoints.
 
 ## 🔒 Authentication
 
-### Login
-```http
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-```
-
-Response:
-```json
-{
-  "token": "jwt_token",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "name": "User Name"
-  }
-}
-```
+All endpoints require authentication. Use JWT for user sessions and API keys for service access.
 
 ### Register
-```http
-POST /api/auth/register
-Content-Type: application/json
+**POST** `/api/auth/register` - Create new user account
 
+**Request:**
+```json
 {
   "email": "user@example.com",
   "password": "securepassword",
@@ -39,10 +18,33 @@ Content-Type: application/json
 }
 ```
 
-Response:
+**Response:**
 ```json
 {
-  "token": "jwt_token",
+  "token": "jwt_token_here",
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com", 
+    "name": "User Name"
+  }
+}
+```
+
+### Login
+**POST** `/api/auth/login` - Get access token
+
+**Request:**
+```json
+{
+  "email": "user@example.com",
+  "password": "securepassword"
+}
+```
+
+**Response:**
+```json
+{
+  "token": "jwt_token_here",
   "user": {
     "id": "uuid",
     "email": "user@example.com",
@@ -51,133 +53,92 @@ Response:
 }
 ```
 
-## 🤖 AGI Endpoints
+### Current User
+**GET** `/api/auth/me` - Get current user info
 
-### Chat
-```http
-POST /api/agi/chat
-Content-Type: application/json
-Authorization: Bearer jwt_token
+**Headers:** `Authorization: Bearer jwt_token`
 
+**Response:**
+```json
 {
-  "message": "What is the weather in New York?",
-  "context": {
-    "location": "New York",
-    "units": "metric"
-  }
+  "id": "uuid",
+  "email": "user@example.com",
+  "name": "User Name"
 }
 ```
 
-Response:
+## 🤖 Chat
+
+### Send Message
+**POST** `/api/agi/messages` - Send message to AI
+
+**Headers:** `Authorization: Bearer jwt_token`
+
+**Request:**
 ```json
 {
-  "response": "The weather in New York is sunny with a temperature of 25°C.",
+  "content": "What is the weather today?",
+  "conversation_id": "uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "conversation_id": "uuid",
+  "response": "I'll help you check the weather...",
   "metadata": {
     "model": "gemini-2.5-flash",
-    "tokens": 150,
-    "processing_time": 1.2
+    "tokens": 150
   }
 }
 ```
 
-### Streaming Chat
-```http
-POST /api/agi/chat/stream
-Content-Type: application/json
-Authorization: Bearer jwt_token
+### Create Conversation
+**POST** `/api/agi/conversations` - Start new conversation
 
+**Headers:** `Authorization: Bearer jwt_token`
+
+**Response:**
+```json
 {
-  "message": "Tell me a story",
-  "stream": true
+  "conversation_id": "uuid"
 }
 ```
 
-Response: Server-Sent Events (SSE) stream
+### Get Messages
+**GET** `/api/agi/conversations/:id/messages` - Get conversation history
 
-### Status
-```http
-GET /api/agi/status
-Authorization: Bearer jwt_token
-```
+**Headers:** `Authorization: Bearer jwt_token`
 
-Response:
+**Response:**
 ```json
 {
-  "status": "operational",
-  "services": [
+  "messages": [
     {
-      "name": "openai",
-      "status": "operational",
-      "latency": 150
+      "id": "uuid",
+      "role": "user",
+      "content": "Hello",
+      "created_at": "2024-03-20T10:00:00Z"
     },
     {
-      "name": "vector_store",
-      "status": "operational",
-      "latency": 50
+      "id": "uuid", 
+      "role": "assistant",
+      "content": "Hi! How can I help you?",
+      "created_at": "2024-03-20T10:00:05Z"
     }
   ]
 }
 ```
 
-## 📁 File Management
-
-### Upload File
-```http
-POST /api/files/upload
-Content-Type: multipart/form-data
-Authorization: Bearer jwt_token
-
-file: [binary]
-metadata: {
-  "type": "document",
-  "tags": ["important", "work"]
-}
-```
-
-Response:
-```json
-{
-  "id": "uuid",
-  "url": "https://example.com/files/uuid",
-  "metadata": {
-    "type": "document",
-    "tags": ["important", "work"],
-    "size": 1024,
-    "mime_type": "application/pdf"
-  }
-}
-```
-
-### Get File
-```http
-GET /api/files/:id
-Authorization: Bearer jwt_token
-```
-
-Response: File stream
-
-### Delete File
-```http
-DELETE /api/files/:id
-Authorization: Bearer jwt_token
-```
-
-Response:
-```json
-{
-  "success": true
-}
-```
-
 ## 🛠️ Tools
 
-### List Tools
-```http
-GET /api/tools
-Authorization: Bearer jwt_token
-```
+### List Available Tools
+**GET** `/api/tools` - Get all tools
 
-Response:
+**Headers:** `Authorization: Bearer api_key`
+
+**Response:**
 ```json
 {
   "tools": [
@@ -185,162 +146,89 @@ Response:
       "id": "weather",
       "name": "Weather Tool",
       "description": "Get weather information",
-      "parameters": {
-        "location": "string",
-        "units": "string"
-      }
+      "available": true
+    },
+    {
+      "id": "calendar", 
+      "name": "Calendar Tool",
+      "description": "Manage calendar events",
+      "available": false
     }
   ]
 }
 ```
 
 ### Execute Tool
-```http
-POST /api/tools/execute
-Content-Type: application/json
-Authorization: Bearer jwt_token
+**POST** `/api/tools/execute` - Run a tool
 
-{
-  "toolId": "weather",
-  "params": {
-    "location": "New York",
-    "units": "metric"
-  }
-}
-```
+**Headers:** `Authorization: Bearer api_key`
 
-Response:
+**Request:**
 ```json
 {
-  "result": {
-    "temperature": 25,
-    "condition": "sunny",
-    "humidity": 60
-  }
-}
-```
-
-## 💬 Conversation
-
-### List Conversations
-```http
-GET /api/conversation
-Authorization: Bearer jwt_token
-```
-
-Query Parameters:
-- `limit`: number (default: 20)
-- `offset`: number (default: 0)
-
-Response:
-```json
-{
-  "conversations": [
-    {
-      "id": "uuid",
-      "title": "Weather Discussion",
-      "created_at": "2024-03-20T10:00:00Z",
-      "updated_at": "2024-03-20T10:30:00Z"
-    }
-  ],
-  "total": 100,
-  "limit": 20,
-  "offset": 0
-}
-```
-
-### Create Conversation
-```http
-POST /api/conversation
-Content-Type: application/json
-Authorization: Bearer jwt_token
-
-{
-  "title": "Weather Discussion",
-  "context": {
+  "tool_name": "weather",
+  "action": "current",
+  "parameters": {
     "location": "New York"
   }
 }
 ```
 
-Response:
+**Response:**
+```json
+{
+  "success": true,
+  "result": {
+    "temperature": 25,
+    "condition": "sunny"
+  },
+  "execution_id": "uuid"
+}
+```
+
+## 📁 Files
+
+### Upload File
+**POST** `/api/files/upload` - Upload a file
+
+**Headers:** `Authorization: Bearer jwt_token`
+
+**Request:** Multipart form data with file
+
+**Response:**
 ```json
 {
   "id": "uuid",
-  "conversation": {
-    "title": "Weather Discussion",
-    "created_at": "2024-03-20T10:00:00Z",
-    "context": {
-      "location": "New York"
-    }
-  }
+  "url": "/api/files/uuid",
+  "size": 1024,
+  "mime_type": "text/plain"
 }
 ```
 
-### Get Conversation
-```http
-GET /api/conversation/:id
-Authorization: Bearer jwt_token
-```
+### Get File
+**GET** `/api/files/:id` - Download file
 
-Response:
-```json
-{
-  "conversation": {
-    "id": "uuid",
-    "title": "Weather Discussion",
-    "created_at": "2024-03-20T10:00:00Z",
-    "updated_at": "2024-03-20T10:30:00Z",
-    "context": {
-      "location": "New York"
-    }
-  },
-  "messages": [
-    {
-      "id": "uuid",
-      "role": "user",
-      "content": "What's the weather like?",
-      "created_at": "2024-03-20T10:00:00Z"
-    },
-    {
-      "id": "uuid",
-      "role": "assistant",
-      "content": "The weather in New York is sunny with a temperature of 25°C.",
-      "created_at": "2024-03-20T10:00:05Z"
-    }
-  ]
-}
-```
+**Headers:** `Authorization: Bearer jwt_token`
 
-## 🔄 Error Responses
+**Response:** File content with appropriate headers
 
-All endpoints may return the following error responses:
+## ⚠️ Error Responses
+
+All endpoints return consistent error format:
 
 ### 400 Bad Request
 ```json
 {
   "error": "Bad Request",
-  "message": "Invalid input parameters",
-  "details": {
-    "field": "email",
-    "message": "Invalid email format"
-  }
+  "message": "Invalid input data"
 }
 ```
 
 ### 401 Unauthorized
 ```json
 {
-  "error": "Unauthorized",
-  "message": "Invalid or expired token"
-}
-```
-
-### 403 Forbidden
-```json
-{
-  "error": "Forbidden",
-  "message": "Insufficient permissions"
+  "error": "Unauthorized", 
+  "message": "Invalid or missing token"
 }
 ```
 
@@ -352,7 +240,7 @@ All endpoints may return the following error responses:
 }
 ```
 
-### 429 Too Many Requests
+### 429 Rate Limited
 ```json
 {
   "error": "Too Many Requests",
@@ -361,10 +249,41 @@ All endpoints may return the following error responses:
 }
 ```
 
-### 500 Internal Server Error
+### 500 Server Error
 ```json
 {
   "error": "Internal Server Error",
-  "message": "An unexpected error occurred"
+  "message": "Something went wrong"
 }
-``` 
+```
+
+## 🔍 Health Check
+
+### Basic Health
+**GET** `/api/web/health` - Simple health check
+
+**Response:**
+```json
+{
+  "status": "ok"
+}
+```
+
+### Detailed Status
+**GET** `/api/web/health/details` - Service status
+
+**Response:**
+```json
+{
+  "status": "operational",
+  "services": {
+    "database": "connected",
+    "openai": "available", 
+    "google": "available"
+  }
+}
+```
+
+---
+
+**Need help?** Check the [Getting Started Guide](GETTING_STARTED.md) for setup instructions.

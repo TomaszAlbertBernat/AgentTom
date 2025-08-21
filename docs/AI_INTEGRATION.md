@@ -1,362 +1,263 @@
 # AI Integration
 
-This document describes the AI integration features and configuration in AliceAGI.
+How AgentTom connects to AI providers and processes conversations.
 
-## Google Gemini (default) with OpenAI fallback
+## 🤖 AI Providers
 
-We use Google Gemini (AI Studio) as the default LLM provider with automatic fallback to OpenAI when Google returns rate-limit/quota errors. The integration is implemented via the Vercel AI SDK to keep a consistent API across providers.
+### Primary: Google Gemini
+AgentTom uses Google Gemini as the default AI provider:
 
-### Setup
-- Add environment variables (see `.env-example`):
-  - `GOOGLE_API_KEY` — API key from Google AI Studio
-  - `OPENAI_API_KEY` — used as fallback
-  - `DEFAULT_LLM_PROVIDER=google`
-  - `DEFAULT_TEXT_MODEL=gemini-2.5-flash`
-  - `FALLBACK_TEXT_MODEL=gpt-4o-mini`
-
-- Install providers if not present:
   ```bash
-  bun add ai @ai-sdk/google @ai-sdk/openai
-  ```
-
-### Usage pattern (Vercel AI SDK)
-Centralized in `src/services/common/llm.service.ts`. Example shape shown here for reference:
-
-```ts
-import { generateText } from 'ai';
-import { google } from '@ai-sdk/google';
-import { openai } from '@ai-sdk/openai';
-
-// Try Google first, fallback to OpenAI on HTTP 429/quota
-async function generateWithFallback(prompt: string) {
-  try {
-    const { text } = await generateText({ model: google('gemini-2.5-flash'), prompt });
-    return text;
-  } catch (err: any) {
-    const status = err?.status || err?.response?.status;
-    if (status === 429) {
-      const { text } = await generateText({ model: openai('gpt-4o-mini'), prompt });
-      return text;
-    }
-    throw err;
-  }
-}
+# Required in .env
+GOOGLE_API_KEY=your_google_ai_studio_key
+DEFAULT_TEXT_MODEL=gemini-2.5-flash
 ```
 
-### Embeddings
-- Default: Gemini `text-embedding-004` when available
-- Fallback: OpenAI `text-embedding-3-large`
+**Note:** Never use `gemini-2.0-flash` - always use `gemini-2.5-flash` instead.
 
-### Multimodal (vision)
-- Default: Gemini multimodal (e.g., `gemini-1.5-flash`)
-- Image generation: default OpenAI DALL·E 3; optional Vertex Images (Imagen 3) behind env flag
+### Fallback: OpenAI
+Automatic fallback when Google hits rate limits:
 
-#### Vertex Images (Imagen 3) – optional
-- Set env to enable:
-  - `IMAGE_PROVIDER=vertex`
-  - `VERTEX_PROJECT_ID=<gcp-project-id>`
-  - `VERTEX_LOCATION=us-central1` (or your region)
-  - Provide Google credentials via ADC (`GOOGLE_APPLICATION_CREDENTIALS` or workload identity)
-- The service will call Vertex AI Images `imagegeneration:generateImages` and store the returned image.
-
-### Streaming
-- Streaming uses the Vercel AI SDK `streamText`. If initial stream creation fails with 429, we retry with the fallback model.
-
-### Rate limits & quotas
-- Detect rate limits via HTTP 429 and provider-specific messages like “quota” or “resource exhausted”. On detection, we switch to the fallback model and can apply short TTL backoff.
-
-### Audio transcription
-- Default: Gemini via AI Studio using a multimodal model (`gemini-1.5-flash`) with inline audio content
-- Fallback: OpenAI Whisper (`whisper-1`) if Gemini is unavailable or errors
-- Configuration: set `GOOGLE_API_KEY` (or `GOOGLE_GENERATIVE_AI_API_KEY`) for Gemini; `OPENAI_API_KEY` enables fallback
-- Smoke tests: enable with `SMOKE_LLM=1` and at least one of the keys above
-
-### References
-- Google Gemini API
-  - [Overview and docs](https://ai.google.dev/gemini-api/docs)
-  - [Node quickstart](https://ai.google.dev/gemini-api/docs/get-started/node)
-  - [Embeddings guide](https://ai.google.dev/gemini-api/docs/embeddings)
-  - [Multimodal / vision](https://ai.google.dev/gemini-api/docs/vision)
-  - [Rate limits and quotas](https://ai.google.dev/gemini-api/docs/quotas)
-- Vercel AI SDK
-  - [Google provider](https://sdk.vercel.ai/providers/google)
-  - [Introduction](https://sdk.vercel.ai/docs/introduction)
-- OpenAI
-  - [Rate limits](https://platform.openai.com/docs/guides/rate-limits)
-  - [Embeddings: text-embedding-3](https://platform.openai.com/docs/guides/embeddings)
-- Image generation (future option)
-  - [Vertex AI Images API (Imagen 3)](https://cloud.google.com/vertex-ai/generative-ai/docs/image)
-- Speech-to-Text (replacement options for Whisper)
-  - [Google Cloud Speech-to-Text v2](https://cloud.google.com/speech-to-text/v2/docs)
-
-## 🤖 OpenAI Integration
-
-### Configuration
-
-```typescript
-// Configuration in .env
-OPENAI_API_KEY=your_api_key
-OPENAI_MODEL=gpt-4o
-OPENAI_TEMPERATURE=0.7
-OPENAI_MAX_TOKENS=2000
-
-// Usage in code
-import { OpenAI } from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  model: process.env.OPENAI_MODEL,
-  temperature: Number(process.env.OPENAI_TEMPERATURE),
-  maxTokens: Number(process.env.OPENAI_MAX_TOKENS)
-});
+```bash
+# Required in .env
+OPENAI_API_KEY=sk-your_openai_key
+FALLBACK_TEXT_MODEL=gpt-4o-mini
 ```
 
-### Model Configuration
+### How Failover Works
+1. Try Google Gemini first
+2. On HTTP 429 (rate limit), automatically switch to OpenAI
+3. Continue conversation seamlessly
+4. Retry Google after cooldown period
 
-```typescript
-interface ModelConfig {
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  topP: number;
-  frequencyPenalty: number;
-  presencePenalty: number;
-}
+## 🚀 Quick Setup
 
-const defaultConfig: ModelConfig = {
-  model: 'gpt-4o',
-  temperature: 0.7,
-  maxTokens: 2000,
-  topP: 1,
-  frequencyPenalty: 0,
-  presencePenalty: 0
-};
+### 1. Get API Keys
+
+**Google AI Studio:**
+1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create new API key
+3. Add to `.env`: `GOOGLE_API_KEY=AI...`
+
+**OpenAI:**
+1. Visit [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Create new API key
+3. Add to `.env`: `OPENAI_API_KEY=sk-...`
+
+### 2. Basic Configuration
+```bash
+# .env file
+GOOGLE_API_KEY=your_google_key
+OPENAI_API_KEY=your_openai_key
+DEFAULT_LLM_PROVIDER=google
+DEFAULT_TEXT_MODEL=gemini-2.5-flash
+FALLBACK_TEXT_MODEL=gpt-4o-mini
 ```
 
-## 📝 Prompt Management
+### 3. Test Setup
+```bash
+# Start server
+bun run dev
 
-### Directory Structure
-
-```
-prompts/
-├── chat/           # Chat-related prompts
-│   ├── weather.ts
-│   ├── general.ts
-│   └── tools.ts
-├── tools/          # Tool-specific prompts
-│   ├── weather.ts
-│   ├── calendar.ts
-│   └── music.ts
-└── system/         # System-level prompts
-    ├── context.ts
-    └── personality.ts
+# Test chat endpoint
+curl -X POST http://localhost:3000/api/agi/messages \
+  -H "Authorization: Bearer your_jwt_token" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Hello, world!", "conversation_id": "uuid"}'
 ```
 
-### Prompt Structure
+## 💬 Conversation Flow
 
-```typescript
-interface Prompt {
-  system: string;
-  user: string;
-  context?: Record<string, any>;
-  examples?: Array<{
-    input: string;
-    output: string;
-  }>;
-}
-
-export const weatherPrompt: Prompt = {
-  system: `You are a weather assistant. Provide weather information based on the user's location and preferences.`,
-  user: `What's the weather like in {location}?`,
-  context: {
-    units: 'metric',
-    format: 'detailed'
-  },
-  examples: [
-    {
-      input: "What's the weather in London?",
-      output: "The weather in London is currently cloudy with a temperature of 18°C. There's a 20% chance of rain."
-    }
-  ]
-};
+### 1. Message Processing
+```
+User Input → Validation → Context Building → AI Request → Response → Storage
 ```
 
-## 🔍 Vector Search Integration
-
-### Configuration
-
-```typescript
-// Configuration in .env
-QDRANT_URL=your_qdrant_url
-QDRANT_API_KEY=your_api_key
-QDRANT_COLLECTION=conversations
-
-// Vector service configuration
-const vectorConfig = {
-  collection: 'conversations',
-  dimensions: 1536,
-  distance: 'cosine'
-};
-```
-
-### Usage
-
-```typescript
-// Search implementation
-const searchResults = await vectorService.search({
-  query: 'weather in New York',
-  limit: 5,
-  filter: {
-    type: 'weather',
-    date: { $gte: new Date() }
-  }
-});
-
-// Store vectors
-await vectorService.store({
-  id: 'uuid',
-  vector: embedding,
-  metadata: {
-    type: 'weather',
-    location: 'New York',
-    date: new Date()
-  }
-});
-```
-
-## 🧠 AI Processing Pipeline
-
-### 1. Input Processing
-```typescript
-interface ProcessedInput {
-  text: string;
-  context: Record<string, any>;
-  metadata: {
-    source: string;
-    timestamp: Date;
-    user: string;
-  };
-}
-```
-
-### 2. Context Building
-```typescript
-interface Context {
-  conversation: {
-    history: Message[];
-    summary: string;
-  };
-  user: {
-    preferences: Record<string, any>;
-    history: Record<string, any>;
-  };
-  tools: {
-    available: string[];
-    state: Record<string, any>;
-  };
-}
-```
+### 2. Context Management
+- Previous messages included for context
+- System prompts for behavior guidance
+- Tool descriptions for capability awareness
+- User preferences and history
 
 ### 3. Response Generation
-```typescript
-interface GeneratedResponse {
-  text: string;
-  metadata: {
-    model: string;
-    tokens: number;
-    processing_time: number;
-  };
-  actions: Array<{
-    type: string;
-    params: Record<string, any>;
-  }>;
-}
+- Structured prompts sent to AI
+- Tool calls extracted and executed
+- Final response assembled and returned
+- Conversation history updated
+
+## 🔧 Advanced Features
+
+### Streaming Responses
+Real-time message streaming:
+```bash
+curl -X POST http://localhost:3000/api/agi/chat/stream \
+  -H "Authorization: Bearer token" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Tell me a story", "stream": true}'
 ```
 
-## 🔄 Memory Management
+### Multimodal Support
+Handle images and files:
+- Gemini supports image analysis
+- File upload integration
+- Document processing capabilities
 
-### Short-term Memory
-```typescript
-interface ShortTermMemory {
-  conversation: Message[];
-  context: Context;
-  tools: ToolState[];
-}
+### Embeddings and Search
+Vector storage for conversation memory:
+- Automatic embedding generation
+- Semantic search in conversation history
+- Context retrieval for relevant responses
+
+## 📊 Monitoring AI Performance
+
+### Built-in Metrics
+AgentTom tracks:
+- Response times per model
+- Token usage and costs
+- Error rates and fallback usage
+- Conversation completion rates
+
+### Langfuse Integration
+Optional AI observability:
+```bash
+# Add to .env
+LANGFUSE_API_KEY=your_langfuse_key
+LANGFUSE_HOST=https://cloud.langfuse.com
 ```
 
-### Long-term Memory
-```typescript
-interface LongTermMemory {
-  user: {
-    preferences: Record<string, any>;
-    history: Record<string, any>;
-  };
-  knowledge: {
-    facts: Record<string, any>;
-    relationships: Record<string, any>;
-  };
-}
+Features:
+- Trace conversation flows
+- Monitor model performance
+- Track costs and usage
+- Debug conversation issues
+
+## 🔄 Error Handling
+
+### Common Issues and Solutions
+
+**Rate Limit Errors (429)**
+- Automatic fallback to OpenAI
+- Retry logic with backoff
+- User sees seamless experience
+
+**API Key Issues**
+- Check key validity in provider dashboards
+- Verify environment variables are set
+- Test with simple API calls
+
+**Model Availability**
+- Configure multiple fallback models
+- Monitor provider status pages
+- Graceful degradation when needed
+
+**Token Limits**
+- Automatic context trimming
+- Conversation summarization
+- Smart context management
+
+## 🎯 Best Practices
+
+### Model Selection
+- Use `gemini-2.5-flash` for fast responses
+- Use `gpt-4o-mini` for reliable fallback
+- Avoid deprecated models
+
+### Cost Management
+- Monitor token usage regularly
+- Set up usage alerts
+- Optimize prompt length
+
+### Performance Optimization
+- Use streaming for long responses
+- Implement response caching
+- Minimize context window size
+
+### Quality Assurance
+- Test with various input types
+- Monitor response quality
+- Implement feedback loops
+
+## 🔧 Configuration Options
+
+### Model Settings
+```bash
+# Temperature (creativity): 0.0-1.0
+AI_TEMPERATURE=0.7
+
+# Max tokens per response
+AI_MAX_TOKENS=2000
+
+# Context window size
+AI_CONTEXT_LIMIT=8000
 ```
 
-## 📊 AI Monitoring
+### Provider-Specific Settings
+```bash
+# Google settings
+GOOGLE_MODEL_TEMPERATURE=0.7
+GOOGLE_MAX_TOKENS=2000
 
-### Performance Metrics
-```typescript
-interface AIMetrics {
-  response_time: number;
-  token_usage: {
-    prompt: number;
-    completion: number;
-    total: number;
-  };
-  model_performance: {
-    latency: number;
-    throughput: number;
-    error_rate: number;
-  };
-}
+# OpenAI settings
+OPENAI_TEMPERATURE=0.7
+OPENAI_MAX_TOKENS=2000
 ```
 
-### Quality Metrics
-```typescript
-interface QualityMetrics {
-  relevance: number;
-  coherence: number;
-  helpfulness: number;
-  safety: number;
-}
+### Feature Flags
+```bash
+# Enable/disable features
+ENABLE_STREAMING=true
+ENABLE_MULTIMODAL=true
+ENABLE_EMBEDDINGS=true
 ```
 
-## 🔧 Error Handling
+## 🔠 Troubleshooting
 
-### AI-specific Errors
-```typescript
-interface AIError extends Error {
-  type: 'model_error' | 'token_limit' | 'content_filter' | 'rate_limit';
-  details: {
-    model: string;
-    code: string;
-    message: string;
-  };
-  context: {
-    prompt: string;
-    parameters: Record<string, any>;
-  };
-}
+### Debug Mode
+Enable detailed logging:
+```bash
+LOG_LEVEL=DEBUG bun run dev
 ```
 
-### Error Recovery
-```typescript
-const handleAIError = async (error: AIError) => {
-  switch (error.type) {
-    case 'token_limit':
-      return await retryWithShorterContext(error);
-    case 'rate_limit':
-      return await retryWithBackoff(error);
-    case 'content_filter':
-      return await handleContentFilter(error);
-    default:
-      return await fallbackResponse(error);
-  }
-};
-``` 
+### Test AI Connectivity
+```bash
+# Check provider status
+curl http://localhost:3000/api/web/health/details
+```
+
+### Common Error Messages
+
+**"Invalid API key"**
+- Check environment variables
+- Verify key format and validity
+- Ensure key has required permissions
+
+**"Rate limit exceeded"**
+- Normal behavior, fallback should activate
+- Check if OpenAI key is configured
+- Monitor usage in provider dashboards
+
+**"Model not found"**
+- Check model names in configuration
+- Verify provider supports the model
+- Update to supported model versions
+
+## 📈 Scaling Considerations
+
+### High Volume Usage
+- Implement request queuing
+- Add multiple API keys for rotation
+- Monitor and optimize token usage
+
+### Multi-tenancy
+- Separate API keys per tenant
+- Usage tracking and billing
+- Isolation of conversation data
+
+### Global Deployment
+- Regional provider endpoints
+- Latency optimization
+- Compliance with data regulations
+
+---
+
+**Next Steps:** Start with basic Google + OpenAI setup, then add monitoring with Langfuse as usage grows. See [Getting Started](GETTING_STARTED.md) for initial setup. 

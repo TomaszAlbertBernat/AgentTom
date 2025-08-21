@@ -1,323 +1,245 @@
-# Monitoring and Logging
+# Monitoring
 
-This document describes the monitoring and logging capabilities in AliceAGI.
+How to monitor AgentTom health and performance.
 
-## 📊 Monitoring Overview
+## 🔍 Health Checks
 
-### Key Metrics
-- Response times
-- Error rates
-- Resource usage
-- API call volumes
-- AI model performance
-- Tool execution metrics
-
-### Monitoring Tools
-- Sentry for error tracking
-- Langfuse for AI observability
-- Custom logging system
-- Health check endpoints
-
-## 🔍 Sentry Integration
-
-### Configuration
-```typescript
-// Configuration in .env
-SENTRY_DSN=your_sentry_dsn
-SENTRY_ENVIRONMENT=development
-SENTRY_TRACES_SAMPLE_RATE=1.0
-
-// Usage in code
-import * as Sentry from '@sentry/node';
-
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  environment: process.env.SENTRY_ENVIRONMENT,
-  tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE),
-  integrations: [
-    new Sentry.Integrations.Http({ tracing: true }),
-    new Sentry.Integrations.Express()
-  ]
-});
+### Basic Health Check
+```bash
+curl http://localhost:3000/api/web/health
 ```
 
-### Error Tracking
-```typescript
-// Basic error tracking
-try {
-  // Your code
-} catch (error) {
-  Sentry.captureException(error);
-  throw error;
-}
-
-// Custom error tracking
-Sentry.withScope((scope) => {
-  scope.setTag('feature', 'weather');
-  scope.setUser({ id: 'user_id' });
-  scope.setExtra('context', { location: 'New York' });
-  Sentry.captureException(error);
-});
-```
-
-### Performance Monitoring
-```typescript
-// Transaction tracking
-const transaction = Sentry.startTransaction({
-  name: 'weather-request',
-  op: 'http.server'
-});
-
-try {
-  // Your code
-  transaction.setStatus('ok');
-} catch (error) {
-  transaction.setStatus('error');
-  throw error;
-} finally {
-  transaction.finish();
+**Response:**
+```json
+{
+  "status": "ok"
 }
 ```
 
-## 📈 Langfuse Integration
+### Detailed Service Status
+```bash
+curl http://localhost:3000/api/web/health/details
+```
 
-### Configuration
-```typescript
-// Configuration in .env
+**Response:**
+```json
+{
+  "status": "operational",
+  "services": {
+    "database": "connected",
+    "openai": "available",
+    "google": "available",
+    "linear": "configured",
+    "spotify": "not_configured"
+  }
+}
+```
+
+## 📊 Built-in Monitoring
+
+### Application Logs
+AgentTom includes structured logging with different levels:
+
+```bash
+# Enable debug logging
+LOG_LEVEL=DEBUG bun run dev
+
+# Available levels: ERROR, WARN, INFO, DEBUG, TRACE
+```
+
+**Log format:**
+```json
+{
+  "timestamp": "2024-03-20T10:00:00Z",
+  "level": "INFO",
+  "component": "ServiceName",
+  "message": "Operation completed",
+  "metadata": { "duration": 150 }
+}
+```
+
+### Performance Tracking
+The application automatically tracks:
+- Response times for API calls
+- AI model performance and token usage
+- Tool execution times
+- Database query performance
+
+## 🎯 Key Metrics to Monitor
+
+### Application Health
+- **Server uptime** - Is the service running?
+- **Database connectivity** - Can we access SQLite?
+- **AI provider status** - Are Google/OpenAI accessible?
+
+### Performance
+- **Response times** - API endpoints under 200ms
+- **Memory usage** - Watch for memory leaks
+- **AI token usage** - Track costs and rate limits
+
+### Errors
+- **HTTP error rates** - 4xx/5xx response tracking
+- **AI failures** - Model errors and fallback usage
+- **Tool execution failures** - External service issues
+
+## 🔧 Setting Up External Monitoring
+
+### Langfuse (AI Observability)
+Track AI interactions and performance:
+
+```bash
+# Add to .env
 LANGFUSE_API_KEY=your_langfuse_key
 LANGFUSE_HOST=https://cloud.langfuse.com
-
-// Usage in code
-import { Langfuse } from 'langfuse';
-
-const langfuse = new Langfuse({
-  apiKey: process.env.LANGFUSE_API_KEY,
-  host: process.env.LANGFUSE_HOST
-});
 ```
 
-### AI Interaction Tracking
-```typescript
-// Track AI interactions
-const trace = await langfuse.trace({
-  name: 'weather-query',
-  metadata: {
-    location: 'New York',
-    units: 'metric'
-  }
-});
+Features:
+- Trace AI conversations
+- Monitor token usage and costs
+- Track model performance
+- Debug conversation flows
 
-await trace.span({
-  name: 'openai-completion',
-  input: { prompt: 'What is the weather?' },
-  output: { response: 'Sunny, 25°C' }
-});
+### Sentry (Error Tracking)
+Monitor application errors:
+
+```bash
+# Add to .env  
+SENTRY_DSN=your_sentry_dsn
+SENTRY_ENVIRONMENT=production
 ```
 
-### Performance Metrics
-```typescript
-// Track model performance
-await trace.metrics({
-  name: 'model-performance',
-  value: {
-    latency: 150,
-    tokens: 100,
-    cost: 0.002
-  }
-});
+Features:
+- Automatic error capture
+- Performance monitoring
+- Release tracking
+- Alert notifications
+
+## 📈 Monitoring Best Practices
+
+### 1. Start Simple
+- Use built-in health endpoints
+- Monitor basic metrics first
+- Add external tools as needed
+
+### 2. Set Up Alerts
+- Health check failures
+- High error rates (>5%)
+- Slow response times (>1s)
+- AI provider issues
+
+### 3. Track User Experience
+- Conversation completion rates
+- Tool execution success
+- Response quality feedback
+
+### 4. Monitor Costs
+- AI token usage per user
+- External API call volumes
+- Storage usage growth
+
+## 🚨 Common Issues
+
+### High Memory Usage
+**Symptoms:** Gradual memory increase, slow responses
+**Check:** 
+- Long conversation histories
+- File upload processing
+- Vector storage growth
+
+**Solution:**
+- Implement conversation pruning
+- Add file size limits
+- Monitor vector database size
+
+### AI Provider Errors
+**Symptoms:** 429 rate limit errors, API failures
+**Check:**
+- Provider status pages
+- API key validity
+- Usage quotas
+
+**Solution:**
+- Configure fallback providers
+- Implement retry logic
+- Monitor rate limit headers
+
+### Database Lock Issues
+**Symptoms:** SQLite lock errors, timeout responses
+**Check:**
+- Concurrent database operations
+- Long-running queries
+- Migration status
+
+**Solution:**
+- Optimize query patterns
+- Add connection pooling
+- Monitor database file size
+
+## 🔄 Maintenance Tasks
+
+### Daily
+- Check health endpoints
+- Review error logs
+- Monitor resource usage
+
+### Weekly
+- Review AI usage costs
+- Check database size
+- Update dependencies
+
+### Monthly
+- Performance trend analysis
+- Capacity planning
+- Security audit
+
+## 📋 Monitoring Checklist
+
+### Basic Setup
+- [ ] Health endpoints responding
+- [ ] Logs configured and readable
+- [ ] Error tracking enabled
+- [ ] Basic alerts configured
+
+### Production Ready
+- [ ] External monitoring tools connected
+- [ ] Performance baselines established
+- [ ] Incident response procedures
+- [ ] Cost monitoring enabled
+
+### Advanced
+- [ ] Custom dashboards created
+- [ ] Predictive alerts configured
+- [ ] Automated scaling triggers
+- [ ] Business metrics tracking
+
+## 🛠️ Debugging Tools
+
+### Health Endpoint
+Quick service status check:
+```bash
+curl -s http://localhost:3000/api/web/health/details | jq
 ```
 
-## 📝 Logging System
+### Log Analysis
+Search logs for specific issues:
+```bash
+# Find errors in the last hour
+grep "ERROR" logs/app.log | tail -20
 
-### Configuration
-```typescript
-// Configuration in .env
-LOG_LEVEL=info
-LOG_FORMAT=json
-LOG_FILE=logs/app.log
-
-// Logger configuration
-import { logger } from './utils/logger';
-
-logger.configure({
-  level: process.env.LOG_LEVEL,
-  format: process.env.LOG_FORMAT,
-  file: process.env.LOG_FILE
-});
+# Monitor real-time logs
+tail -f logs/app.log | grep "AI_SERVICE"
 ```
 
-### Logging Levels
-```typescript
-// Different logging levels
-logger.error('Critical error occurred', {
-  error: error.message,
-  stack: error.stack
-});
+### Database Inspection
+Direct SQLite queries for debugging:
+```bash
+# Connect to database
+sqlite3 agi.db
 
-logger.warn('Warning message', {
-  context: { userId, action }
-});
-
-logger.info('Information message', {
-  metadata: { version, environment }
-});
-
-logger.debug('Debug information', {
-  details: { request, response }
-});
+# Check recent conversations
+SELECT id, created_at FROM conversations ORDER BY created_at DESC LIMIT 5;
 ```
 
-### Structured Logging
-```typescript
-// Structured logging
-logger.info('API request', {
-  method: 'POST',
-  path: '/api/weather',
-  duration: 150,
-  status: 200,
-  user: {
-    id: 'user_id',
-    role: 'user'
-  }
-});
-```
+---
 
-## 🏥 Health Checks
-
-### Endpoints
-```typescript
-// Health check endpoints
-app.get('/api/health', async (c) => {
-  const health = await healthCheck.checkAll();
-  return c.json(health);
-});
-
-app.get('/api/health/openai', async (c) => {
-  const health = await healthCheck.checkOpenAI();
-  return c.json(health);
-});
-
-app.get('/api/health/database', async (c) => {
-  const health = await healthCheck.checkDatabase();
-  return c.json(health);
-});
-```
-
-### Health Check Implementation
-```typescript
-interface HealthCheck {
-  status: 'healthy' | 'degraded' | 'unhealthy';
-  checks: {
-    [key: string]: {
-      status: 'up' | 'down';
-      latency?: number;
-      error?: string;
-    };
-  };
-}
-
-const healthCheck = {
-  async checkAll(): Promise<HealthCheck> {
-    const checks = await Promise.all([
-      this.checkOpenAI(),
-      this.checkDatabase(),
-      this.checkVectorStore()
-    ]);
-    
-    return {
-      status: this.determineOverallStatus(checks),
-      checks: this.formatChecks(checks)
-    };
-  }
-};
-```
-
-## 📊 Metrics Collection
-
-### Custom Metrics
-```typescript
-interface Metrics {
-  timestamp: Date;
-  type: string;
-  value: number;
-  labels: Record<string, string>;
-}
-
-const metrics = {
-  async record(metric: Metrics) {
-    // Store metric
-    await this.store(metric);
-    
-    // Alert if threshold exceeded
-    if (this.shouldAlert(metric)) {
-      await this.alert(metric);
-    }
-  }
-};
-```
-
-### Performance Metrics
-```typescript
-interface PerformanceMetrics {
-  responseTime: number;
-  memoryUsage: number;
-  cpuUsage: number;
-  activeConnections: number;
-}
-
-const performance = {
-  async collect(): Promise<PerformanceMetrics> {
-    return {
-      responseTime: await this.measureResponseTime(),
-      memoryUsage: process.memoryUsage(),
-      cpuUsage: process.cpuUsage(),
-      activeConnections: await this.getActiveConnections()
-    };
-  }
-};
-```
-
-## 🔔 Alerting
-
-### Alert Configuration
-```typescript
-interface AlertConfig {
-  metric: string;
-  threshold: number;
-  duration: number;
-  severity: 'low' | 'medium' | 'high';
-  channels: string[];
-}
-
-const alerts = {
-  configs: new Map<string, AlertConfig>(),
-  
-  async check(metric: Metrics) {
-    const config = this.configs.get(metric.type);
-    if (config && this.shouldAlert(metric, config)) {
-      await this.sendAlert(metric, config);
-    }
-  }
-};
-```
-
-### Alert Channels
-```typescript
-interface AlertChannel {
-  type: 'email' | 'slack' | 'webhook';
-  config: Record<string, any>;
-}
-
-const alertChannels = {
-  async send(channel: AlertChannel, alert: Alert) {
-    switch (channel.type) {
-      case 'email':
-        return await this.sendEmail(channel.config, alert);
-      case 'slack':
-        return await this.sendSlack(channel.config, alert);
-      case 'webhook':
-        return await this.sendWebhook(channel.config, alert);
-    }
-  }
-};
-``` 
+**Next Steps:** Set up basic monitoring using health endpoints, then gradually add external tools like Langfuse for AI observability as needed.

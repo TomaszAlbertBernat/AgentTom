@@ -1,275 +1,396 @@
-# Testing Documentation for AgentTom
+# Testing Guide
 
-## Overview
+How to write and run tests in AgentTom.
 
-AgentTom uses Bun's built-in test runner for fast, reliable unit testing. The testing infrastructure is designed to help maintain code quality and catch regressions during development.
+## 🧪 Test Framework
 
-## Test Structure
+AgentTom uses **Bun's built-in test runner** for fast, reliable testing.
 
+### Test Structure
 ```
 tests/
-├── unit/           # Unit tests for individual components
+├── unit/           # Individual component tests
 │   ├── services/   # Service layer tests
-│   ├── routes/     # API route tests
 │   └── utils/      # Utility function tests
-├── integration/    # Integration tests
+├── integration/    # Service interaction tests
 └── helpers/        # Test utilities and mocks
 ```
 
-## Running Tests
+## 🚀 Running Tests
 
-### All Tests
+### Basic Commands
 ```bash
-bun test
+bun test                    # Run all tests
+bun test --watch           # Watch mode for development
+bun test --coverage        # Run with coverage report
 ```
 
-### Specific Test File
+### Specific Tests
 ```bash
+# Run specific test file
 bun test tests/unit/services/logger.service.test.ts
+
+# Run tests matching pattern
+bun test --grep "auth"
 ```
 
-### Watch Mode
+### Available Scripts
 ```bash
-bun test --watch
+bun run test              # Run all tests
+bun run test:watch        # Watch mode
+bun run test:coverage     # Coverage report
 ```
 
-### Coverage Report
-```bash
-bun test --coverage
-```
+## ✍️ Writing Tests
 
-## Test Scripts
-
-Available in `package.json`:
-
-- `bun run test` - Run all tests
-- `bun run test:watch` - Run tests in watch mode
-- `bun run test:coverage` - Run tests with coverage report
-
-## Current Test Coverage
-
-### ✅ Completed Test Suites
-
-#### 1. Logger Service (`tests/unit/services/logger.service.test.ts`)
-- **28 tests** covering all logging functionality
-- Tests log levels, logger creation, component loggers
-- Validates convenience methods (startup, database, api, tool, migration)
-- Environment handling and error scenarios
-- Mock logger functionality for test isolation
-
-#### 2. Vector Service (`tests/unit/services/vector.service.test.ts`)
-- **14 tests** covering vector operations
-- Environment validation and configuration
-- Vector search, upsert, and delete operations
-- Error handling and edge cases
-- Vector similarity calculations and normalization
-
-#### 3. Search Service (`tests/unit/services/search.service.test.ts`)
-- **10 tests** covering search functionality
-- Search query structure validation
-- RRF (Reciprocal Rank Fusion) score calculations
-- Filter matching and Algolia filter building
-- Complex filter combinations and edge cases
-
-#### 4. Basic Infrastructure (`tests/unit/utils/basic.test.ts`)
-- **11 tests** validating test infrastructure
-- Math utilities (add, multiply, divide)
-- String utilities (capitalize, reverse, palindrome)
-- Async operation handling
-- Basic assertion validation
-
-### 📊 Test Statistics
-
-- **Total Tests**: 62
-- **Total Assertions**: 194+ expect() calls
-- **Execution Time**: ~168ms
-- **Pass Rate**: 100%
-- **Files Covered**: 4 test files
-
-## Writing Tests
-
-### Test File Naming
-
-Follow the pattern: `{service-name}.test.ts`
-
+### Basic Test Structure
 ```typescript
-// tests/unit/services/example.service.test.ts
 import { test, expect, describe } from 'bun:test';
 
-describe('Example Service', () => {
-  test('should do something', () => {
-    expect(true).toBe(true);
-  });
-});
-```
-
-### Test Structure
-
-Use descriptive nested describe blocks:
-
-```typescript
 describe('Service Name', () => {
-  describe('Feature Group', () => {
-    test('should handle specific case', () => {
-      // Test implementation
+  describe('method name', () => {
+    test('should handle valid input', () => {
+      // Arrange
+      const input = { name: 'test', value: 42 };
+      
+      // Act
+      const result = processInput(input);
+      
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.data).toBeDefined();
+    });
+    
+    test('should reject invalid input', () => {
+      // Arrange
+      const input = { name: '', value: -1 };
+      
+      // Act
+      const result = processInput(input);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid');
     });
   });
 });
 ```
 
-### Mock Data and Utilities
-
-Create mock data that mirrors real service interfaces:
-
+### Testing Async Functions
 ```typescript
-const mockData = {
-  uuid: 'test-uuid',
-  content: 'test content',
-  metadata: { test: true }
+test('should handle async operations', async () => {
+  const result = await asyncFunction();
+  expect(result).toBeDefined();
+});
+
+test('should handle async errors', async () => {
+  await expect(failingAsyncFunction()).rejects.toThrow('Expected error');
+});
+```
+
+### Mock Data Patterns
+```typescript
+// Create realistic mock data
+const mockUser = {
+  id: 'test-user-id',
+  email: 'test@example.com',
+  name: 'Test User'
+};
+
+const mockResponse = {
+  success: true,
+  data: mockUser,
+  metadata: { timestamp: new Date() }
 };
 ```
 
-### Async Testing
+## 📊 Current Test Coverage
 
-Handle async operations properly:
+### Completed Test Suites
 
+**Logger Service** - 28 tests
+- Log levels and logger creation
+- Component-specific loggers
+- Environment handling
+- Mock logger functionality
+
+**Vector Service** - 14 tests  
+- Vector operations (search, upsert, delete)
+- Environment validation
+- Error handling and edge cases
+
+**Search Service** - 10 tests
+- Search query validation
+- RRF score calculations  
+- Filter matching and building
+
+**Basic Utils** - 11 tests
+- Math and string utilities
+- Async operation handling
+- Test infrastructure validation
+
+### Test Statistics
+- **Total Tests:** 63 tests
+- **Execution Time:** ~168ms
+- **Pass Rate:** 100%
+
+## 🎯 Testing Best Practices
+
+### 1. Test Organization
 ```typescript
-test('should handle async operations', async () => {
-  const result = await someAsyncFunction();
-  expect(result).toBeDefined();
+// ✅ Use descriptive test names
+test('should return user data when valid ID provided', () => {
+  // test implementation
+});
+
+// ❌ Avoid vague test names
+test('should work', () => {
+  // test implementation
 });
 ```
 
-## Testing Best Practices
-
-### 1. Test Structure
-- Use descriptive test names that explain the expected behavior
-- Group related tests in `describe` blocks
-- Keep tests isolated and independent
-
-### 2. Assertions
-- Use specific matchers (`toBe`, `toContain`, `toBeGreaterThan`)
-- Test both happy path and error cases
-- Validate expected data types and structures
-
-### 3. Mock Data
-- Create realistic mock data that matches production interfaces
-- Use proper TypeScript types for mock objects
-- Keep mock data focused on the test requirements
-
-### 4. Error Testing
-- Test error scenarios and edge cases
-- Validate error messages and types
-- Use `expect().toThrow()` for exception testing
-
-## Common Test Patterns
-
-### Testing Service Methods
-
+### 2. Arrange-Act-Assert Pattern
 ```typescript
-test('should handle service method', () => {
-  const result = service.methodName(input);
-  expect(result).toHaveProperty('expectedProperty');
-  expect(result.expectedProperty).toBe('expectedValue');
-});
-```
-
-### Testing Data Validation
-
-```typescript
-test('should validate input data', () => {
-  const validData = { /* valid structure */ };
-  const invalidData = { /* invalid structure */ };
+test('should calculate total correctly', () => {
+  // Arrange - Set up test data
+  const items = [{ price: 10 }, { price: 20 }];
   
-  expect(() => validate(validData)).not.toThrow();
-  expect(() => validate(invalidData)).toThrow();
+  // Act - Execute the function
+  const total = calculateTotal(items);
+  
+  // Assert - Check the result
+  expect(total).toBe(30);
 });
 ```
 
-### Testing Async Operations
-
+### 3. Test Both Success and Error Cases
 ```typescript
-test('should handle async operations', async () => {
-  const promise = asyncFunction();
-  await expect(promise).resolves.toBeDefined();
+describe('validateEmail', () => {
+  test('should accept valid email', () => {
+    expect(validateEmail('test@example.com')).toBe(true);
+  });
+  
+  test('should reject invalid email', () => {
+    expect(validateEmail('invalid')).toBe(false);
+  });
+  
+  test('should handle empty input', () => {
+    expect(validateEmail('')).toBe(false);
+  });
 });
 ```
 
-## Integration with Development
+### 4. Use Specific Assertions
+```typescript
+// ✅ Be specific about what you're testing
+expect(result).toHaveProperty('id');
+expect(result.data).toBeInstanceOf(Array);
+expect(result.status).toBe(200);
 
-### IDE Integration
-- Tests work with VSCode and Cursor
-- TypeScript errors in test files are cosmetic (Bun handles runtime)
-- Use test runner integration for immediate feedback
-
-### CI/CD Integration
-Tests can be integrated into GitHub Actions:
-
-```yaml
-- name: Run Tests
-  run: bun test
+// ❌ Avoid overly generic assertions
+expect(result).toBeTruthy();
 ```
 
-### Pre-commit Hooks
-Consider adding tests to pre-commit hooks:
+## 🔧 Testing Patterns
 
-```json
-{
-  "pre-commit": "bun test"
+### Service Testing
+```typescript
+describe('UserService', () => {
+  test('should create user with valid data', async () => {
+    const userData = {
+      email: 'test@example.com',
+      password: 'securePassword',
+      name: 'Test User'
+    };
+    
+    const result = await userService.create(userData);
+    
+    expect(result.success).toBe(true);
+    expect(result.user).toHaveProperty('id');
+    expect(result.user.email).toBe(userData.email);
+  });
+});
+```
+
+### Error Testing
+```typescript
+test('should handle database connection error', async () => {
+  // Mock a database error
+  const mockError = new Error('Database connection failed');
+  
+  const result = await serviceWithDatabaseCall();
+  
+  expect(result.success).toBe(false);
+  expect(result.error).toContain('connection');
+});
+```
+
+### Validation Testing
+```typescript
+describe('input validation', () => {
+  test('should accept valid input schema', () => {
+    const validInput = { name: 'test', age: 25 };
+    expect(() => validateInput(validInput)).not.toThrow();
+  });
+  
+  test('should reject invalid input schema', () => {
+    const invalidInput = { name: '', age: -1 };
+    expect(() => validateInput(invalidInput)).toThrow();
+  });
+});
+```
+
+## 🛠️ Testing Utilities
+
+### Mock Helper Functions
+```typescript
+// tests/helpers/mocks.ts
+export const createMockUser = (overrides = {}) => ({
+  id: 'mock-user-id',
+  email: 'mock@example.com',
+  name: 'Mock User',
+  ...overrides
+});
+
+export const createMockResponse = (data: any) => ({
+  success: true,
+  data,
+  timestamp: new Date().toISOString()
+});
+```
+
+### Environment Setup
+```typescript
+// Set test environment variables
+beforeEach(() => {
+  process.env.LOG_LEVEL = 'ERROR'; // Reduce noise in tests
+  process.env.NODE_ENV = 'test';
+});
+
+afterEach(() => {
+  // Clean up if needed
+});
+```
+
+## 🚀 Integration Testing
+
+### API Endpoint Testing
+```typescript
+test('should authenticate user with valid credentials', async () => {
+  const credentials = {
+    email: 'test@example.com',
+    password: 'validPassword'
+  };
+  
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials)
+  });
+  
+  expect(response.status).toBe(200);
+  
+  const data = await response.json();
+  expect(data).toHaveProperty('token');
+  expect(data.user.email).toBe(credentials.email);
+});
+```
+
+### Database Testing
+```typescript
+test('should store and retrieve user data', async () => {
+  // Create test user
+  const user = await createUser({ email: 'test@example.com' });
+  
+  // Retrieve user
+  const retrieved = await getUserById(user.id);
+  
+  expect(retrieved.email).toBe('test@example.com');
+});
+```
+
+## 📈 Test Development Workflow
+
+### 1. Write Failing Test First (TDD)
+```typescript
+test('should calculate tax correctly', () => {
+  const result = calculateTax(100, 0.1);
+  expect(result).toBe(10);
+});
+```
+
+### 2. Implement Minimal Code
+```typescript
+function calculateTax(amount: number, rate: number): number {
+  return amount * rate;
 }
 ```
 
-## Future Test Development
-
-### Priority Areas
-
-1. **API Route Testing**: Test all HTTP endpoints
-2. **Database Integration**: Test with actual database operations  
-3. **Tool Service Testing**: Test individual tool implementations
-4. **Error Handling**: Comprehensive error scenario testing
-5. **Performance Testing**: Load and performance validation
-
-### Test Utilities to Add
-
-1. **Database Fixtures**: Reusable test data setup
-2. **HTTP Test Client**: For API endpoint testing
-3. **Mock External Services**: For integration testing
-4. **Test Data Factories**: Automated test data generation
-
-## Debugging Tests
-
-### Running Individual Tests
-```bash
-bun test tests/unit/services/logger.service.test.ts
+### 3. Refactor and Improve
+```typescript
+function calculateTax(amount: number, rate: number): number {
+  if (amount < 0 || rate < 0) {
+    throw new Error('Amount and rate must be positive');
+  }
+  return Math.round(amount * rate * 100) / 100;
+}
 ```
 
-### Verbose Output
-Add console logs for debugging:
+## 🔍 Debugging Tests
 
+### Debug Individual Tests
+```bash
+# Run specific test with detailed output
+bun test tests/unit/auth.test.ts --verbose
+```
+
+### Add Debug Logging
 ```typescript
 test('debug test', () => {
-  console.log('Debug info:', data);
+  const data = processData(input);
+  console.log('Debug data:', data);
   expect(data).toBeDefined();
 });
 ```
 
-### Environment Variables
-Set test-specific environment:
-
+### Test Environment Variables
 ```typescript
-beforeEach(() => {
-  process.env.LOG_LEVEL = 'ERROR'; // Reduce noise
+test('should use test environment', () => {
+  expect(process.env.NODE_ENV).toBe('test');
 });
 ```
 
-## Summary
+## 🎯 Testing Checklist
 
-The AgentTom testing infrastructure provides:
+### Before Writing Tests
+- [ ] Understand what you're testing
+- [ ] Identify edge cases and error conditions
+- [ ] Prepare mock data if needed
 
-- ✅ **Fast Execution**: Bun's optimized test runner
-- ✅ **Comprehensive Coverage**: Core services thoroughly tested  
-- ✅ **Developer Friendly**: Easy to write and maintain tests
-- ✅ **CI/CD Ready**: Suitable for automated testing pipelines
-- ✅ **Type Safe**: Full TypeScript support for test code
+### Writing Tests
+- [ ] Use descriptive test names
+- [ ] Follow Arrange-Act-Assert pattern
+- [ ] Test both success and failure paths
+- [ ] Use specific assertions
 
-This foundation ensures AgentTom maintains high code quality as it continues to evolve and new features are added. 
+### After Writing Tests
+- [ ] All tests pass locally
+- [ ] Tests run quickly (under 1 second each)
+- [ ] Tests are independent and can run in any order
+- [ ] Mock external dependencies
+
+## 📚 Resources
+
+### Testing Examples
+- Look at existing tests in `tests/unit/` for patterns
+- Check `tests/helpers/` for reusable utilities
+- Review service tests for integration patterns
+
+### Bun Test Documentation
+- [Bun Test Runner](https://bun.sh/docs/cli/test)
+- Built-in matchers and assertions
+- Mock and spy functionality
+
+---
+
+**Quick Start:** Run `bun test` to see existing tests, then create your own following the patterns in `tests/unit/services/`.

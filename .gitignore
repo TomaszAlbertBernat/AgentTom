@@ -89,3 +89,4 @@ todo/generated/
 
 # Keep backlog (todo/) tracked by default; generated views remain ignored
 README-agent-system.md
+guidelines.md

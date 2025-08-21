@@ -1,183 +1,186 @@
-# AliceAGI Architecture
+# Architecture
 
-This document describes the architecture and core components of AliceAGI.
+How AgentTom is built and organized.
+
+## 🏗️ System Overview
+
+AgentTom is a TypeScript/Bun application that provides AI conversation capabilities with tool integrations. It follows a layered architecture with clear separation of concerns.
 
 ## 📁 Project Structure
 
 ```
 src/
-├── config/         # Configuration files and environment setup
-├── database/       # Database setup, migrations, and seed data
-├── dto/           # Data Transfer Objects for API requests/responses
-├── middleware/    # Custom middleware (auth, rate limiting, etc.)
-├── prompts/       # AI prompts and conversation templates
-├── routes/        # API route handlers and controllers
-├── schema/        # Database schemas and models
-├── services/      # Business logic and external service integrations
-├── types/         # TypeScript type definitions and interfaces
-├── utils/         # Utility functions and helpers
-├── app.ts         # Application setup and configuration
-└── index.ts       # Entry point and server initialization
+├── config/         # Environment and feature configuration
+├── database/       # SQLite database and migrations
+├── middleware/     # Request processing (auth, validation, etc.)
+├── routes/         # API endpoints 
+├── services/       # Business logic and integrations
+├── schema/         # Database models and validation
+├── types/          # TypeScript definitions
+├── utils/          # Helper functions
+├── app.ts          # Application setup
+└── index.ts        # Server entry point
 ```
 
-## 🏗️ Core Components
+## 🔄 Request Flow
 
-### 1. Application Layer
-- **Entry Point** (`index.ts`)
-  - Server initialization
-  - Middleware setup
-  - Route registration
-  - Service initialization
+1. **HTTP Request** → Middleware chain
+2. **Middleware** → Authentication, validation, rate limiting
+3. **Route Handler** → Endpoint-specific logic
+4. **Service Layer** → Business logic and external calls
+5. **Database/AI** → Data storage and AI processing
+6. **HTTP Response** → JSON response to client
 
-- **App Configuration** (`app.ts`)
-  - Hono application setup
-  - Global middleware configuration
-  - Error handling setup
+## 🔧 Core Components
 
-### 2. API Layer
-- **Routes** (`routes/`)
-  - Authentication routes
-  - AGI endpoints
-  - File management
-  - Tool execution
-  - Conversation handling
+### Database Layer
+- **SQLite** with Drizzle ORM
+- **Migrations** in `src/database/migrations/`
+- **Schemas** in `src/schema/`
+- **Auto-migration** on server start
 
-- **Middleware** (`middleware/`)
-  - Authentication
-  - Rate limiting
-  - Error handling
-  - Request validation with Zod
-  - Logging
+### Authentication
+- **JWT tokens** for user sessions
+- **API keys** for service access
+- **Middleware** validates all protected routes
 
-### 3. Service Layer
-- **AI Services** (`services/ai/`)
-  - OpenAI integration (Vercel AI SDK)
-  - Prompt management
-  - Response processing
+### AI Integration
+- **Google Gemini** as primary provider
+- **OpenAI** as fallback
+- **Vercel AI SDK** for consistent interface
+- **Automatic failover** on rate limits
 
-- **Tool Services** (`services/tools/`)
-  - Tool execution
-  - Tool configuration
-  - Tool state management
+### Tool System
+- **Plugin architecture** for external services
+- **Schema validation** for tool parameters
+- **Execution tracking** and error handling
+- **Available tools**: Weather, Calendar, File operations, Web search
 
-- **Vector Services** (`services/vector/`)
-  - Vector search
-  - Embedding generation
-  - Similarity matching
+## 📊 Data Flow
 
-### 4. Data Layer
-- **Database** (`database/`)
-  - SQLite setup with Drizzle ORM
-  - Migration management
-  - Seed data
+### Chat Messages
+```
+User Input → Validation → AI Service → Response → Database → User
+```
 
-- **Schemas** (`schema/`)
-  - Database models
-  - Type definitions
-  - Zod validation schemas
+### Tool Execution
+```
+Tool Request → Parameter Validation → Tool Service → External API → Result Storage
+```
 
-## 🔄 Data Flow
+### File Upload
+```
+File Upload → MIME Validation → Storage → Database Record → File URL
+```
 
-1. **Request Flow**
-   ```
-   Client Request
-   → Middleware (Auth, Rate Limit, Zod Validation)
-   → Route Handler
-   → Service Layer
-   → Database/External Services
-   → Response
-   ```
+## 🔒 Security
 
-2. **AI Processing Flow**
-   ```
-   User Input
-   → Zod Input Validation
-   → Context Building
-   → Prompt Generation
-   → OpenAI Model Processing
-   → Response Generation
-   → Vector Storage
-   → User Response
-   ```
+### Input Validation
+- **Zod schemas** for all API inputs
+- **MIME type checking** for file uploads
+- **SQL injection protection** via ORM
+- **XSS prevention** through sanitization
 
-3. **Tool Execution Flow**
-   ```
-   Tool Request
-   → Zod Tool Validation
-   → Context Preparation
-   → Tool Execution
-   → Result Processing
-   → Response Generation
-   ```
+### Authentication Flow
+- **Registration** → Password hash → JWT token
+- **Login** → Credential check → JWT token
+- **API access** → API key validation
+- **Protected routes** → JWT + optional API key
 
-## 🔒 Security Architecture
+### Rate Limiting
+- **Redis-backed** counters (optional)
+- **Per-endpoint** limits
+- **Graceful degradation** without Redis
 
-1. **Authentication**
-   - JWT-based authentication
-   - Token refresh mechanism
-   - Session management
+## 🌐 External Integrations
 
-2. **Authorization**
-   - Role-based access control
-   - Resource-level permissions
-   - API key management
+### Required Services
+- **Google AI Studio** - Primary LLM provider
+- **OpenAI** - Fallback LLM provider
 
-3. **Data Protection**
-   - Zod input validation
-   - Output sanitization
-   - Rate limiting
-   - CORS protection
+### Optional Services
+- **Linear** - Project management
+- **Spotify** - Music control
+- **Google Maps** - Location services
+- **Resend** - Email notifications
+- **ElevenLabs** - Text-to-speech
+- **Firecrawl** - Web scraping
 
-## 📊 Monitoring Architecture
+## 📈 Monitoring
 
-1. **Error Tracking**
-   - Sentry integration
-   - Error categorization
-   - Stack trace analysis
+### Health Checks
+- `/api/web/health` - Basic status
+- `/api/web/health/details` - Service availability
 
-2. **Performance Monitoring**
-   - Response time tracking
-   - Resource usage monitoring
-   - API call tracking
+### Logging
+- **Structured logging** with levels (ERROR → TRACE)
+- **Service-specific** loggers
+- **Performance tracking** for AI calls
 
-3. **AI Monitoring**
-   - Langfuse integration
-   - Prompt tracking
-   - Response quality monitoring
+### Error Tracking
+- **Langfuse** for AI observability
+- **Sentry** integration ready
+- **Centralized error handling**
+
+## 🚀 Deployment Architecture
+
+### Development
+- **Bun dev server** with hot reload
+- **SQLite file** database
+- **Local file storage**
+- **Permissive CORS**
+
+### Production
+- **Bun runtime** or Docker
+- **Environment variables** for secrets
+- **File storage** (local or cloud)
+- **Reverse proxy** recommended
 
 ## 🔄 State Management
 
-1. **Application State**
-   - In-memory caching
-   - Session storage
-   - Configuration management
+### Application State
+- **In-memory** configuration
+- **Database** for persistent data
+- **Redis** for caching (optional)
 
-2. **AI State**
-   - Conversation context
-   - Tool state
-   - Vector store
+### Conversation State
+- **Database storage** for message history
+- **Context building** for AI calls
+- **Memory management** for long conversations
 
-3. **Database State**
-   - Transaction management
-   - Connection pooling
-   - Migration state
+### Tool State
+- **Execution tracking** in database
+- **Error logging** for debugging
+- **Performance metrics** collection
 
-## 🎯 Development Principles
+## 🎯 Design Principles
 
-1. **Code Organization**
-   - Functional programming approach
-   - Interface-first design
-   - Descriptive naming conventions
-   - Early error handling
+1. **Simplicity** - Clear, readable code
+2. **Type Safety** - TypeScript throughout
+3. **Error Handling** - Fail fast with good messages
+4. **Modularity** - Independent services
+5. **Configuration** - Environment-driven setup
 
-2. **Type Safety**
-   - TypeScript for all code
-   - Zod for runtime validation
-   - Interface definitions
-   - Type inference
+## 🔌 Extension Points
 
-3. **Testing Strategy**
-   - Unit tests
-   - Integration tests
-   - End-to-end tests
-   - Test coverage requirements 
+### Adding New Tools
+1. Create service in `src/services/tools/`
+2. Add schema to `src/config/tool-schemas.ts`
+3. Register in `src/config/tools.config.ts`
+4. Update API documentation
+
+### Adding New Routes
+1. Create route file in `src/routes/`
+2. Add middleware as needed
+3. Register in `src/app.ts`
+4. Add tests and documentation
+
+### Adding New Services
+1. Create service in appropriate `src/services/` subfolder
+2. Define interface and implementation
+3. Add configuration and environment variables
+4. Write unit tests
+
+---
+
+**Need more details?** Check [Development Guidelines](DEVELOPMENT.md) for coding standards and [Getting Started](GETTING_STARTED.md) for setup instructions.
