@@ -1,94 +1,28 @@
 import { z } from 'zod';
 
-// Define the environment schema
+// Define the simplified environment schema for local-first usage
 const envSchema = z.object({
   // Basic app configuration
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']).default('INFO'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   APP_URL: z.string().default('http://localhost:3000'),
-  API_KEY: z.string().min(1).optional(),
-  JWT_SECRET: z.string().min(1).default('dev-secret'),
-  APP_TIMEZONE: z.string().default('Europe/Warsaw'),
-  DISABLE_API_KEY: z.enum(['true', 'false']).default((process.env.NODE_ENV || 'development') === 'production' ? 'false' : 'true'),
 
-  // Authentication mode
+  // Authentication - simplified for local-first
   AUTH_MODE: z.enum(['local', 'multiuser']).default('local'),
 
-  // AI Providers
-  OPENAI_API_KEY: z.string().min(1).optional(),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  XAI_API_KEY: z.string().optional(),
-  GOOGLE_API_KEY: z.string().optional(),
-  // Images provider selection (default: OpenAI DALL·E). Set to 'vertex' to use Vertex Images.
-  IMAGE_PROVIDER: z.string().optional(),
-  VERTEX_PROJECT_ID: z.string().optional(),
-  VERTEX_LOCATION: z.string().optional(),
+  // AI Providers - simplified to essentials
+  GOOGLE_API_KEY: z.string().optional(), // Required: Primary AI provider
+  OPENAI_API_KEY: z.string().min(1).optional(), // Optional: Fallback AI provider
 
-  // LLM defaults (optional overrides)
-  DEFAULT_LLM_PROVIDER: z.string().optional(),
-  DEFAULT_TEXT_MODEL: z.string().optional(),
-  FALLBACK_TEXT_MODEL: z.string().optional(),
-
-  // Langfuse
-  LANGFUSE_SECRET_KEY: z.string().optional(),
-  LANGFUSE_PUBLIC_KEY: z.string().optional(),
-  LANGFUSE_BASEURL: z.string().optional(),
-
-  // Vector Database
-  QDRANT_INDEX: z.string().optional(),
-  QDRANT_URL: z.string().optional(),
-  QDRANT_API_KEY: z.string().optional(),
-
-  // Search
-  ALGOLIA_INDEX: z.string().optional(),
-  ALGOLIA_APP_ID: z.string().optional(),
-  ALGOLIA_API_KEY: z.string().optional(),
-
-  // Google Services
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_REDIRECT_URI: z.string().optional(),
-  GOOGLE_ACCESS_TOKEN: z.string().optional(),
-  GOOGLE_REFRESH_TOKEN: z.string().optional(),
-  GOOGLE_TOKEN_EXPIRY: z.string().optional(),
-
-  // Calendar (separate Google project)
-  CALENDAR_CLIENT_ID: z.string().optional(),
-  CALENDAR_CLIENT_SECRET: z.string().optional(),
-
-  // External Services
-  FIRECRAWL_API_KEY: z.string().optional(),
-  ELEVENLABS_API_KEY: z.string().optional(),
-  RESEND_API_KEY: z.string().optional(),
-  SMS_PHONE_NUMBER: z.string().optional(),
-  FROM_EMAIL: z.string().optional(),
-  USER_EMAIL: z.string().optional(),
-
-  // Linear
-  LINEAR_API_KEY: z.string().optional(),
-  LINEAR_DEFAULT_TEAM_ID: z.string().optional(),
-  LINEAR_DEFAULT_ASSIGNEE_ID: z.string().optional(),
-  LINEAR_WEBHOOK_SECRET: z.string().optional(),
-
-  // Spotify
-  SPOTIFY_CLIENT_ID: z.string().optional(),
-  SPOTIFY_CLIENT_SECRET: z.string().optional(),
-
-  // Hardware
-  ELGATO_LIGHTS_ON: z.string().optional(),
-  ELGATO_LIGHTS_OFF: z.string().optional(),
-
-  // Crypto
-  COIN_MARKET_CAP_API_KEY: z.string().optional(),
-
-  // CORS
-  CORS_ORIGIN: z.string().optional(),
+  // Optional overrides for advanced users
+  DEFAULT_LLM_PROVIDER: z.string().optional(), // Default: 'google'
+  DEFAULT_TEXT_MODEL: z.string().optional(), // Default: 'gemini-2.5-flash'
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
 
-// Validate environment variables
+// Validate environment variables with simplified local-first approach
 export const validateEnv = (): EnvConfig => {
   try {
     return envSchema.parse(process.env);
@@ -96,9 +30,7 @@ export const validateEnv = (): EnvConfig => {
     if (error instanceof z.ZodError) {
       const missingVars = error.issues
         .filter((issue) => issue.code === 'invalid_type' && (issue as any).received === 'undefined')
-        .map((issue) => issue.path.join('.'))
-        // In development, ignore missing optional keys like API_KEY
-        .filter((name) => (process.env.NODE_ENV || 'development') === 'production' ? true : name !== 'API_KEY');
+        .map((issue) => issue.path.join('.'));
 
       const invalidVars = error.issues
         .filter((issue) => !(issue.code === 'invalid_type' && (issue as any).received === 'undefined'))
@@ -107,7 +39,7 @@ export const validateEnv = (): EnvConfig => {
       console.error('❌ Environment validation failed:');
 
       if (missingVars.length > 0) {
-        console.error('\n🔴 Missing required environment variables:');
+        console.error('\n🔴 Missing environment variables:');
         missingVars.forEach((varName) => console.error(`  - ${varName}`));
       }
 
@@ -116,17 +48,17 @@ export const validateEnv = (): EnvConfig => {
         invalidVars.forEach((issueMsg) => console.error(`  - ${issueMsg}`));
       }
 
-      console.error('\n💡 Please check your .env file and ensure all required variables are set.');
-      console.error('📋 You can use .env-example as a template.\n');
+      console.error('\n💡 For local-first usage, only GOOGLE_API_KEY is required.');
+      console.error('📋 You can configure API keys via the setup wizard at /setup');
+      console.error('📄 Or copy the .env.example template to .env and add your API keys');
 
-      // In development and test modes, do not hard exit to improve DX and allow tests to run
+      // In development and test modes, provide safe defaults for local-first usage
       const nodeEnv = process.env.NODE_ENV || 'development';
       if (nodeEnv !== 'development' && nodeEnv !== 'test') {
         process.exit(1);
       } else {
-        console.warn('⚠️  Continuing in development despite env validation warnings.');
-        console.warn('💡  In local mode, you can configure API keys via the setup wizard at /setup');
-        
+        console.warn('⚠️  Using default configuration for local-first development.');
+
         // Provide a best-effort config with safe defaults for local mode
         const devConfig = {
           ...process.env,
@@ -134,15 +66,11 @@ export const validateEnv = (): EnvConfig => {
           LOG_LEVEL: process.env.LOG_LEVEL || 'INFO',
           PORT: process.env.PORT || '3000',
           APP_URL: process.env.APP_URL || 'http://localhost:3000',
-          JWT_SECRET: process.env.JWT_SECRET || 'dev-secret',
-          APP_TIMEZONE: process.env.APP_TIMEZONE || 'Europe/Warsaw',
-          DISABLE_API_KEY: process.env.DISABLE_API_KEY || 'true',
           AUTH_MODE: process.env.AUTH_MODE || 'local',
           DEFAULT_LLM_PROVIDER: process.env.DEFAULT_LLM_PROVIDER || 'google',
           DEFAULT_TEXT_MODEL: process.env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash',
-          FALLBACK_TEXT_MODEL: process.env.FALLBACK_TEXT_MODEL || 'gpt-4o-mini',
         };
-        
+
         // Parse with the safe config - this should not throw
         return envSchema.parse(devConfig);
       }
@@ -160,46 +88,22 @@ if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && env.GOOGLE_API_KEY) {
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = env.GOOGLE_API_KEY;
 }
 
-// Helper functions to check service availability
+// Simplified service availability for local-first usage
 export const isServiceEnabled = {
-  langfuse: () => !!(env.LANGFUSE_SECRET_KEY && env.LANGFUSE_PUBLIC_KEY),
-  qdrant: () => !!(env.QDRANT_URL && env.QDRANT_API_KEY && env.QDRANT_INDEX),
-  algolia: () => !!(env.ALGOLIA_APP_ID && env.ALGOLIA_API_KEY && env.ALGOLIA_INDEX),
-  google: () => !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
-  calendar: () => !!(env.CALENDAR_CLIENT_ID && env.CALENDAR_CLIENT_SECRET),
-  firecrawl: () => !!env.FIRECRAWL_API_KEY,
-  elevenlabs: () => !!env.ELEVENLABS_API_KEY,
-  resend: () => !!env.RESEND_API_KEY,
-  linear: () => !!env.LINEAR_API_KEY,
-  spotify: () => !!(env.SPOTIFY_CLIENT_ID && env.SPOTIFY_CLIENT_SECRET),
-  anthropic: () => !!env.ANTHROPIC_API_KEY,
-  xai: () => !!env.XAI_API_KEY,
-  coinMarketCap: () => !!env.COIN_MARKET_CAP_API_KEY,
+  google: () => !!env.GOOGLE_API_KEY, // Primary AI provider
+  openai: () => !!env.OPENAI_API_KEY, // Optional fallback AI provider
 };
 
-// Log service availability on startup
+// Simplified service status logging for local-first usage
 export const logServiceStatus = () => {
-  console.log('\n🔧 Service Configuration Status:');
+  console.log('\n🔧 Configuration Status:');
   console.log('================================');
   console.log(`🎯 Auth Mode: ${env.AUTH_MODE === 'local' ? 'LOCAL (single-user)' : 'MULTI-USER'}`);
   console.log('================================');
-  
+
   const services = [
-    { name: 'Google Gemini', enabled: !!env.GOOGLE_API_KEY, required: true },
-    { name: 'OpenAI', enabled: !!env.OPENAI_API_KEY, required: false },
-    { name: 'Anthropic', enabled: isServiceEnabled.anthropic(), required: false },
-    { name: 'XAI', enabled: isServiceEnabled.xai(), required: false },
-    { name: 'Langfuse', enabled: isServiceEnabled.langfuse(), required: false },
-    { name: 'Qdrant', enabled: isServiceEnabled.qdrant(), required: false },
-    { name: 'Algolia', enabled: isServiceEnabled.algolia(), required: false },
-    { name: 'Google Services', enabled: isServiceEnabled.google(), required: false },
-    { name: 'Calendar', enabled: isServiceEnabled.calendar(), required: false },
-    { name: 'Firecrawl', enabled: isServiceEnabled.firecrawl(), required: false },
-    { name: 'ElevenLabs', enabled: isServiceEnabled.elevenlabs(), required: false },
-    { name: 'Resend', enabled: isServiceEnabled.resend(), required: false },
-    { name: 'Linear', enabled: isServiceEnabled.linear(), required: false },
-    { name: 'Spotify', enabled: isServiceEnabled.spotify(), required: false },
-    { name: 'CoinMarketCap', enabled: isServiceEnabled.coinMarketCap(), required: false },
+    { name: 'Google Gemini', enabled: isServiceEnabled.google(), required: true },
+    { name: 'OpenAI', enabled: isServiceEnabled.openai(), required: false },
   ];
 
   services.forEach(service => {
@@ -213,36 +117,23 @@ export const logServiceStatus = () => {
   const totalRequired = services.filter(s => s.required).length;
 
   console.log('================================');
-  console.log(`📊 ${enabledCount}/${services.length} services configured`);
-  console.log(`🔑 ${requiredCount}/${totalRequired} required services enabled`);
-  
+  console.log(`📊 ${enabledCount}/${services.length} AI providers configured`);
+  console.log(`🔑 ${requiredCount}/${totalRequired} required providers enabled`);
+
   if (requiredCount < totalRequired) {
-    console.log('⚠️  Some required services are not configured!');
+    console.log('⚠️  Google API key is required for local-first usage!');
   }
-  
+
   console.log('');
 }; 
 
 /**
- * Returns structured service configuration status for health endpoints
+ * Returns simplified service configuration status for local-first usage
  */
 export const getServiceStatus = () => {
   const services = [
-    { name: 'Google Gemini', enabled: !!env.GOOGLE_API_KEY, required: true },
-    { name: 'OpenAI', enabled: !!env.OPENAI_API_KEY, required: false },
-    { name: 'Anthropic', enabled: isServiceEnabled.anthropic(), required: false },
-    { name: 'XAI', enabled: isServiceEnabled.xai(), required: false },
-    { name: 'Langfuse', enabled: isServiceEnabled.langfuse(), required: false },
-    { name: 'Qdrant', enabled: isServiceEnabled.qdrant(), required: false },
-    { name: 'Algolia', enabled: isServiceEnabled.algolia(), required: false },
-    { name: 'Google Services', enabled: isServiceEnabled.google(), required: false },
-    { name: 'Calendar', enabled: isServiceEnabled.calendar(), required: false },
-    { name: 'Firecrawl', enabled: isServiceEnabled.firecrawl(), required: false },
-    { name: 'ElevenLabs', enabled: isServiceEnabled.elevenlabs(), required: false },
-    { name: 'Resend', enabled: isServiceEnabled.resend(), required: false },
-    { name: 'Linear', enabled: isServiceEnabled.linear(), required: false },
-    { name: 'Spotify', enabled: isServiceEnabled.spotify(), required: false },
-    { name: 'CoinMarketCap', enabled: isServiceEnabled.coinMarketCap(), required: false },
+    { name: 'Google Gemini', enabled: isServiceEnabled.google(), required: true },
+    { name: 'OpenAI', enabled: isServiceEnabled.openai(), required: false },
   ];
 
   const enabledCount = services.filter(s => s.enabled).length;

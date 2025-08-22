@@ -1,8 +1,8 @@
-import {Context, MiddlewareHandler} from 'hono';
+import { MiddlewareHandler} from 'hono';
 import type { StatusCode } from 'hono/utils/http-status';
 import {HTTPException} from 'hono/http-exception';
 import {z} from 'zod';
-import { BaseError, ValidationError, NotFoundError, DatabaseError, UniqueConstraintError, ForeignKeyError } from '../utils/errors';
+import { ValidationError, NotFoundError, DatabaseError, UniqueConstraintError, ForeignKeyError } from '../utils/errors';
 import { createLogger } from '../services/common/logger.service';
 
 type ErrorResponse = {

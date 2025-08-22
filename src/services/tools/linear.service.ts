@@ -6,7 +6,7 @@
 
 import { z } from 'zod';
 import { LinearClient, Issue, Project, IssueConnection, WorkflowState } from '@linear/sdk';
-import { LangfuseSpanClient } from '../../types/langfuse';
+
 import { stateManager } from '../agent/state.service';
 import { documentService } from '../agent/document.service';
 import type { DocumentType } from '../agent/document.service';
@@ -274,17 +274,14 @@ ${state.description ? `Description: ${state.description}` : ''}`
 
   /**
    * Gets context maps for projects and states
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
    * @returns {Promise<{projectMap: Map<string, ProjectInfo>, stateMap: Map<string, StateInfo>}>} Maps of project and state information
    */
-  getContextMaps: async (span?: LangfuseSpanClient) => {
+  getContextMaps: async () => {
     try {
-      span?.event({ name: 'linear_get_context_maps_start' });
-
       const client = ensureLinearClient();
       const [projects, states] = await Promise.all([
         client.projects(),
-        linearService.fetchTeamStates(DEFAULT_TEAM_ID, span)
+        linearService.fetchTeamStates(DEFAULT_TEAM_ID)
       ]);
 
       const projectMap = new Map<string, ProjectInfo>(
@@ -309,21 +306,9 @@ ${state.description ? `Description: ${state.description}` : ''}`
         ])
       );
 
-      span?.event({
-        name: 'linear_get_context_maps_complete',
-        output: { 
-          projects: projectMap.size,
-          states: stateMap.size
-        }
-      });
 
       return { projectMap, stateMap };
     } catch (error) {
-      span?.event({
-        name: 'linear_get_context_maps_error',
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
       throw error;
     }
   }
@@ -337,49 +322,24 @@ const linearService = {
   /**
    * Creates a new Linear issue
    * @param {z.infer<typeof issueSchema>} payload - The issue creation payload
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
    * @returns {Promise<Issue|null>} The created issue or null if creation failed
    * @throws {Error} If issue creation fails
    */
   createIssue: async (
-    payload: z.infer<typeof issueSchema>, 
-    span?: LangfuseSpanClient
+    payload: z.infer<typeof issueSchema>
   ): Promise<Issue | null> => {
     try {
-      span?.event({
-        name: 'linear_create_issue_start',
-        input: { payload }
-      });
-
       const client = ensureLinearClient();
       const result = await client.createIssue(issueSchema.parse(payload));
-      
+
       if (!result.success || !result.issue) {
-        span?.event({
-          name: 'linear_create_issue_error',
-          input: { payload },
-          output: { error: 'Issue creation failed' },
-          level: 'ERROR'
-        });
         return null;
       }
 
       const issue = await result.issue;
 
-      span?.event({
-        name: 'linear_create_issue_success',
-        input: { payload },
-        output: { issueId: issue.id }
-      });
-
       return issue;
     } catch (error) {
-      span?.event({
-        name: 'linear_create_issue_error',
-        input: { payload },
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
       throw error;
     }
   },
@@ -387,22 +347,15 @@ const linearService = {
   /**
    * Creates multiple Linear issues in parallel
    * @param {z.infer<typeof issueSchema>[]} issues - Array of issue creation payloads
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
    * @returns {Promise<{successful: Issue[], failed: Array<{input: z.infer<typeof issueSchema>, error: Error}>}>} Results of the batch creation
    */
   createManyIssues: async (
-    issues: z.infer<typeof issueSchema>[], 
-    span?: LangfuseSpanClient
+    issues: z.infer<typeof issueSchema>[]
   ): Promise<{ successful: Issue[]; failed: Array<{ input: z.infer<typeof issueSchema>; error: Error }> }> => {
-    span?.event({
-      name: 'linear_create_many_issues_start',
-      input: { count: issues.length }
-    });
-
     const results = await Promise.all(
       issues.map(async (issue) => {
         try {
-          const result = await linearService.createIssue(issue, span);
+          const result = await linearService.createIssue(issue);
           return { success: true, data: result, input: issue };
         } catch (error) {
           return { 
@@ -423,64 +376,32 @@ const linearService = {
       return acc;
     }, { successful: [] as Issue[], failed: [] as Array<{ input: z.infer<typeof issueSchema>; error: Error }> });
 
-    span?.event({
-      name: 'linear_create_many_issues_complete',
-      input: { total: issues.length },
-      output: { 
-        successful: outcome.successful.length, 
-        failed: outcome.failed.length 
-      }
-    });
-
     return outcome;
   },
 
   /**
    * Updates an existing Linear issue
    * @param {z.infer<typeof updateIssueSchema>} payload - The issue update payload
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
    * @returns {Promise<Issue|null>} The updated issue or null if update failed
    * @throws {Error} If issue update fails
    */
   updateIssue: async (
-    payload: z.infer<typeof updateIssueSchema>, 
-    span?: LangfuseSpanClient
+    payload: z.infer<typeof updateIssueSchema>
   ): Promise<Issue | null> => {
     try {
       const { issueId, ...updateData } = updateIssueSchema.parse(payload);
 
-      span?.event({
-        name: 'linear_update_issue_start',
-        input: { issueId, updateData }
-      });
 
       const client = ensureLinearClient();
       const result = await client.updateIssue(issueId, updateData);
       
       if (!result.success || !result.issue) {
-        span?.event({
-          name: 'linear_update_issue_error',
-          input: { issueId, updateData },
-          output: { error: 'Issue update failed' },
-          level: 'ERROR'
-        });
         return null;
       }
 
-      span?.event({
-        name: 'linear_update_issue_success',
-        input: { issueId },
-        output: { issue: (await result.issue).id }
-      });
 
       return result.issue;
     } catch (error) {
-      span?.event({
-        name: 'linear_update_issue_error',
-        input: payload,
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
       throw error;
     }
   },
@@ -488,13 +409,12 @@ const linearService = {
   /**
    * Fetches Linear issues based on search criteria
    * @param {z.infer<typeof searchIssuesSchema>} params - Search parameters
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
    * @returns {Promise<Issue[]>} Array of matching issues
    * @throws {Error} If issue fetching fails
    */
   fetchIssues: async (
     params: z.infer<typeof searchIssuesSchema>, 
-    span?: LangfuseSpanClient
+    
   ): Promise<Issue[]> => {
     try {
       const { projectIds, startDate, endDate } = searchIssuesSchema.parse(params);
@@ -532,40 +452,23 @@ const linearService = {
 
       return allIssues;
     } catch (error) {
-      span?.event({
-        name: 'linear_fetch_issues_error',
-        input: params,
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
       throw error;
     }
   },
 
   /**
    * Fetches all Linear projects
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
    * @returns {Promise<Project[]>} Array of all projects
    * @throws {Error} If project fetching fails
    */
-  fetchProjects: async (span?: LangfuseSpanClient) => {
+  fetchProjects: async () => {
     try {
-      span?.event({ name: 'linear_fetch_projects_start' });
       const client = ensureLinearClient();
       const projects = await client.projects();
       
-      span?.event({
-        name: 'linear_fetch_projects_complete',
-        output: { count: projects.nodes.length }
-      });
 
       return projects.nodes;
     } catch (error) {
-      span?.event({
-        name: 'linear_fetch_projects_error',
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
       throw error;
     }
   },
@@ -573,34 +476,18 @@ const linearService = {
   /**
    * Fetches detailed information about a specific project
    * @param {string} projectId - The ID of the project to fetch
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
    * @returns {Promise<Project|null>} The project details or null if not found
    * @throws {Error} If project fetching fails
    */
-  fetchProjectDetails: async (projectId: string, span?: LangfuseSpanClient): Promise<Project | null> => {
+  fetchProjectDetails: async (projectId: string): Promise<Project | null> => {
     try {
-      span?.event({
-        name: 'linear_fetch_project_details_start',
-        input: { projectId }
-      });
 
       const client = ensureLinearClient();
       const project = await client.project(projectId);
       
-      span?.event({
-        name: 'linear_fetch_project_details_complete',
-        input: { projectId },
-        output: { found: !!project }
-      });
 
       return project;
     } catch (error) {
-      span?.event({
-        name: 'linear_fetch_project_details_error',
-        input: { projectId },
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
       throw error;
     }
   },
@@ -608,16 +495,11 @@ const linearService = {
   /**
    * Fetches workflow states for a team
    * @param {string} [teamId=DEFAULT_TEAM_ID] - The team ID to fetch states for
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
    * @returns {Promise<WorkflowState[]>} Array of workflow states
    * @throws {Error} If state fetching fails
    */
-  fetchTeamStates: async (teamId: string = DEFAULT_TEAM_ID, span?: LangfuseSpanClient): Promise<WorkflowState[]> => {
+  fetchTeamStates: async (teamId: string = DEFAULT_TEAM_ID): Promise<WorkflowState[]> => {
     try {
-      span?.event({
-        name: 'linear_fetch_team_states_start',
-        input: { teamId }
-      });
 
       const client = ensureLinearClient();
       const team = await client.team(teamId);
@@ -627,20 +509,9 @@ const linearService = {
 
       const states = await team.states();
       
-      span?.event({
-        name: 'linear_fetch_team_states_complete',
-        input: { teamId },
-        output: { count: states.nodes.length }
-      });
 
       return states.nodes;
     } catch (error) {
-      span?.event({
-        name: 'linear_fetch_team_states_error',
-        input: { teamId },
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
       throw error;
     }
   },
@@ -648,18 +519,13 @@ const linearService = {
   /**
    * Formats an array of issues into a readable string
    * @param {Issue[]} issues - Array of issues to format
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
    * @returns {Promise<string>} Formatted string representation of issues
    * @throws {Error} If formatting fails
    */
-  formatIssues: async (issues: Issue[], span?: LangfuseSpanClient): Promise<string> => {
+  formatIssues: async (issues: Issue[]): Promise<string> => {
     try {
-      span?.event({
-        name: 'linear_format_issues_start',
-        input: { issueCount: issues.length }
-      });
 
-      const { projectMap, stateMap } = await formatters.getContextMaps(span);
+      const { projectMap, stateMap } = await formatters.getContextMaps(undefined);
       
       // Wait for all issue details to be formatted
       const formattedIssues = await Promise.all(
@@ -672,18 +538,9 @@ const linearService = {
         formattedIssues
       );
 
-      span?.event({
-        name: 'linear_format_issues_complete',
-        output: { formattedCount: formattedIssues.length }
-      });
 
       return report;
     } catch (error) {
-      span?.event({
-        name: 'linear_format_issues_error',
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
       throw error;
     }
   },
@@ -692,14 +549,13 @@ const linearService = {
    * Executes a Linear action with the given payload
    * @param {string} action - The action to execute (must be one of LINEAR_ACTIONS)
    * @param {unknown} payload - The action payload
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
    * @returns {Promise<DocumentType>} Document containing the action result
    * @throws {Error} If action execution fails
    */
   execute: async (
     action: string,
     payload: unknown,
-    span?: LangfuseSpanClient
+    
   ): Promise<DocumentType> => {
     const state = stateManager.getState();
     try {
@@ -708,15 +564,11 @@ const linearService = {
         throw new Error(`Unknown action: ${action}`);
       }
 
-      span?.event({
-        name: 'linear_execute_start',
-        input: { action, payload }
-      });
 
       switch (action) {
         case 'add_tasks': {
           const { tasks, conversation_uuid } = addTasksPayloadSchema.parse(payload);
-          const result = await linearService.createManyIssues(tasks, span);
+          const result = await linearService.createManyIssues(tasks);
           
           const content = `
 Created ${result.successful.length} issues successfully.
@@ -747,7 +599,7 @@ ${result.failed.map(f => `- "${f.input.title}": ${f.error.message}`).join('\n')}
         case 'update_tasks': {
           const { tasks, conversation_uuid } = updateTasksPayloadSchema.parse(payload);
           const results = await Promise.all(
-            tasks.map(task => linearService.updateIssue(task, span))
+            tasks.map(task => linearService.updateIssue(task))
           );
 
           const successful = results.filter((r): r is Issue => r !== null);
@@ -777,8 +629,8 @@ ${successful.map(issue => `- "${issue.title}" (${issue.id})`).join('\n')}`;
         case 'search_tasks': {
           const { projectIds, startDate, endDate, conversation_uuid } = getTasksPayloadSchema.parse(payload);
           
-          const issues = await linearService.fetchIssues({ projectIds, startDate, endDate }, span);
-          const formattedContent = await linearService.formatIssues(issues, span);
+          const issues = await linearService.fetchIssues({ projectIds, startDate, endDate });
+          const formattedContent = await linearService.formatIssues(issues);
 
           return documentService.createDocument({
             conversation_uuid: conversation_uuid,
@@ -795,7 +647,7 @@ ${successful.map(issue => `- "${issue.title}" (${issue.id})`).join('\n')}`;
         }
 
         case 'get_projects': {
-          const projects = await linearService.fetchProjects(span);
+          const projects = await linearService.fetchProjects(undefined);
           const formattedContent = formatters.formatProjectsList(projects);
 
           return documentService.createDocument({
@@ -813,7 +665,7 @@ ${successful.map(issue => `- "${issue.title}" (${issue.id})`).join('\n')}`;
         }
 
         case 'get_states': {
-          const states = await linearService.fetchTeamStates(DEFAULT_TEAM_ID, span);
+          const states = await linearService.fetchTeamStates(DEFAULT_TEAM_ID);
           const formattedContent = formatters.formatStatesList(states);
 
           const conversation_uuid = (payload as any)?.conversation_uuid ?? state.config.conversation_uuid ?? 'unknown';
@@ -836,12 +688,6 @@ ${successful.map(issue => `- "${issue.title}" (${issue.id})`).join('\n')}`;
           throw new Error(`Unknown action: ${action}`);
       }
     } catch (error) {
-      span?.event({
-        name: 'linear_execute_error',
-        input: { action, payload },
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
 
       return documentService.createErrorDocument({
         error: error instanceof Error ? error : new Error('Unknown error'),
@@ -854,10 +700,9 @@ ${successful.map(issue => `- "${issue.title}" (${issue.id})`).join('\n')}`;
 
   /**
    * Gets context about recent tasks (last 7 days and next 7 days)
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracing
    * @returns {Promise<DocumentType>} Document containing recent tasks context
    */
-  getRecentTasksContext: async (span?: LangfuseSpanClient): Promise<DocumentType> => {
+  getRecentTasksContext: async (): Promise<DocumentType> => {
     const today = new Date();
     const startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const endDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -868,7 +713,7 @@ ${successful.map(issue => `- "${issue.title}" (${issue.id})`).join('\n')}`;
       startDate,
       endDate,
       conversation_uuid: state.config.conversation_uuid ?? 'unknown'
-    }, span);
+    });
   }
 };
 

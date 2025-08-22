@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useToast } from '@/lib/hooks/useToast';
 import { api } from '@/lib/api/client-wrapper';
-import { parseZodSchema, getToolActionSchemas, type ToolActionSchema } from '@/lib/schema-parser';
+import { parseZodSchema, type ToolActionSchema } from '@/lib/schema-parser';
 import SchemaDrivenForm from './SchemaDrivenForm';
 import { toolSchemas } from '@/config/tool-schemas';
 
@@ -21,7 +21,7 @@ export default function ToolExecuteForm({ toolName, available }: Props) {
   const [params, setParams] = useState('{}');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
-  const [rateInfo, setRateInfo] = useState<{ remaining?: number; limit?: number; reset?: number } | null>(null);
+  const [rateInfo, _setRateInfo] = useState<{ remaining?: number; limit?: number; reset?: number } | null>(null);
 
   // Check if this tool should use schema-driven forms
   const useSchemaDriven = SCHEMA_DRIVEN_TOOLS.includes(toolName);

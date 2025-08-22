@@ -21,8 +21,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// Note: LangfuseSpanClient type would need proper import if available
-type LangfuseSpanClient = any;
+
 
 const imagePayloadSchema = z.discriminatedUnion('action', [
   z.object({
@@ -214,7 +213,7 @@ interface ImageDocumentMetadata extends DocumentMetadata {
 }
 
 const imageService = {
-  execute: async (action: string, payload: unknown, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  execute: async (action: string, payload: unknown): Promise<DocumentType> => {
     const state = stateManager.getState();
     const conversation_uuid = state.config.conversation_uuid || 'unknown';
 

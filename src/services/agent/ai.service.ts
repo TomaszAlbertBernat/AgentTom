@@ -21,7 +21,7 @@ import {taskService} from './task.service';
 import {actionService} from './action.service';
 
 import type {Action, AgentThoughts, Task, ToolUsePayload, ToolUseResponse} from '../../types/agent';
-import {LangfuseSpanClient, LangfuseTraceClient} from 'langfuse';
+import {SimpleSpan} from './observer.service';
 import {prompt as fastTrackPrompt} from '../../prompts/agent/fast';
 import { linearService } from '../tools/linear.service';
 import { calendarService } from './calendar.service';
@@ -50,7 +50,7 @@ export const aiService = {
    * }
    * ```
    */
-  fastTrack: async (span: LangfuseTraceClient): Promise<boolean> => {
+  fastTrack: async (span: any): Promise<boolean> => {
     const messages = stateManager.getState().interaction.messages;
     const last_three_user_messages = messages
       .filter(message => message.role === 'user' || message.role === 'assistant')
@@ -139,7 +139,7 @@ export const aiService = {
    * console.log(`Environment: ${state.thoughts.environment}`);
    * ```
    */
-  observe: async (span: LangfuseSpanClient) => {
+  observe: async (span: SimpleSpan) => {
     const state = stateManager.getState();
     const user_message = state.interaction.messages.at(-1)?.content ?? 'Hello';
 
@@ -208,7 +208,7 @@ export const aiService = {
    * console.log(`Available tools: ${state.thoughts.tools.length}`);
    * ```
    */
-  draft: async (span: LangfuseSpanClient) => {
+  draft: async (span: SimpleSpan) => {
     const state = stateManager.getState();
     const user_message = state.interaction.messages.at(-1)?.content ?? 'Hello';
 
@@ -276,7 +276,7 @@ export const aiService = {
    * console.log(`Created ${state.interaction.tasks.length} tasks`);
    * ```
    */
-  plan: async (span: LangfuseSpanClient) => {
+  plan: async (span: SimpleSpan) => {
     const state = stateManager.getState();
 
     const user_message = state.interaction.messages.at(-1)?.content ?? 'Hello';
@@ -328,7 +328,7 @@ export const aiService = {
    * }
    * ```
    */
-  next: async (span: LangfuseSpanClient) => {
+  next: async (span: SimpleSpan) => {
     const state = stateManager.getState();
     const user_message = state.interaction.messages.at(-1)?.content ?? 'Hello';
 
@@ -434,7 +434,7 @@ export const aiService = {
    * }
    * ```
    */
-  use: async (span: LangfuseSpanClient) => {
+  use: async (span: SimpleSpan) => {
     let state = stateManager.getState();
     const user_message = state.interaction.messages.at(-1)?.content ?? 'Hello';
 
@@ -521,24 +521,24 @@ export const aiService = {
    * const result = await aiService.act({
    *   action: 'search',
    *   payload: { query: 'AI developments' }
-   * }, span);
+   * };
    * console.log('Tool execution result:', result);
    * ```
    */
-  act: async ({action, payload}: ToolUsePayload, span: LangfuseSpanClient) => {
+  act: async ({action, payload}: ToolUsePayload, span: SimpleSpan) => {
     const state = stateManager.getState();
     const current_tool = state.config.current_tool;
 
     const tool = toolsMap[current_tool?.name ?? 'unknown'];
     if (!tool) {
-      await span.end({
+      await span.end?.({
         output: `Tool ${current_tool?.name} not found`
       });
       throw new Error(`Tool ${current_tool?.name} not found`);
     }
 
     try {
-      const result = await tool.execute(action, {...payload, conversation_uuid: state.config.conversation_uuid}, span);
+      const result = await tool.execute(action, {...payload, conversation_uuid: state.config.conversation_uuid};
 
       if (state.config.current_action?.uuid) {
         await updateActionState({
@@ -547,7 +547,7 @@ export const aiService = {
         });
       }
 
-      await span.event({
+      await span.event?.({
         name: `${current_tool?.name.toLowerCase()}_execution_complete`,
         input: {action, payload},
         output: result,

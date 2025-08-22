@@ -4,7 +4,7 @@
  * @module openapi.config
  */
 
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { OpenAPIHono, z } from '@hono/zod-openapi';
 
 /**
  * OpenAPI specification configuration

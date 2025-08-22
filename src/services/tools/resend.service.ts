@@ -1,13 +1,9 @@
 import {Resend} from 'resend';
 import {z} from 'zod';
-import {LangfuseSpanClient} from 'langfuse';
 import {marked} from 'marked';
-import {DocumentMetadata} from '../../types/document';
+import { stateManager } from '../agent/state.service';
 import {documentService} from '../agent/document.service';
 import type {DocumentType} from '../agent/document.service';
-import { stateManager } from '../agent/state.service';
-import {documents} from '../../schema/document';
-import {eq} from 'drizzle-orm';
 import { createLogger } from '../common/logger.service';
 
 const log = createLogger('Tools:Resend');
@@ -38,7 +34,7 @@ const resendService = {
     return new Resend(env.RESEND_API_KEY);
   },
 
-  sendEmail: async (payload: EmailPayload, span?: LangfuseSpanClient): Promise<string> => {
+  sendEmail: async (payload: EmailPayload): Promise<string> => {
     try {
       const client = resendService.createClient();
       const html = payload.text ? await marked(payload.text) : payload.html;
@@ -52,32 +48,15 @@ const resendService = {
         attachments: payload.attachments
       });
 
-      span?.event({
-        name: 'email_sent',
-        input: {
-          to: payload.to,
-          subject: payload.subject
-        }
-      });
-
       return data?.id ?? '';
     } catch (error) {
-      span?.event({
-        name: 'email_error',
-        input: {
-          to: payload.to,
-          subject: payload.subject
-        },
-        output: {error: error instanceof Error ? error.message : 'Unknown error'},
-        level: 'ERROR'
-      });
       throw error;
     }
   },
 
-  handleEmailSend: async (payload: EmailPayload, conversation_uuid: string, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  handleEmailSend: async (payload: EmailPayload, conversation_uuid: string): Promise<DocumentType> => {
     try {
-      await resendService.sendEmail(payload, span);
+      await resendService.sendEmail(payload);
 
       return documentService.createDocument({
         conversation_uuid,
@@ -133,7 +112,7 @@ const resendService = {
     return attachments;
   },
 
-  execute: async (action: string, payload: any, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  execute: async (action: string, payload: any): Promise<DocumentType> => {
     if (action !== 'send_email') {
       throw new Error(`Unknown action: ${action}`);
     }
@@ -154,17 +133,7 @@ const resendService = {
         attachments
       };
 
-      span?.event({
-        name: 'tool_resend',
-        input: {
-          action,
-          to: email_payload.to,
-          subject: email_payload.subject,
-          attachment_count: attachments?.length
-        }
-      });
-
-      return resendService.handleEmailSend(email_payload, state.config.conversation_uuid ?? 'unknown', span);
+      return resendService.handleEmailSend(email_payload, state.config.conversation_uuid ?? 'unknown');
     } catch (error) {
       return documentService.createDocument({
         conversation_uuid: state.config.conversation_uuid ?? 'unknown',

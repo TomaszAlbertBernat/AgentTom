@@ -1,5 +1,4 @@
-import {z} from 'zod';
-import {LangfuseSpanClient} from 'langfuse';
+
 import { createLogger } from '../common/logger.service';
 const log = createLogger('Tools:YouTube');
 import {parse} from 'node-html-parser';
@@ -56,18 +55,13 @@ const youtubeService = {
     return /(?:youtube\.com|youtu\.be)/i.test(url);
   },
 
-  getTranscript: async (url: string, lang: string = 'en', span?: LangfuseSpanClient): Promise<string> => {
+  getTranscript: async (url: string, lang: string = 'en'): Promise<string> => {
     const video_id = extractVideoId(url);
     if (!video_id) {
       throw new Error('Invalid YouTube URL');
     }
 
     try {
-      span?.event({
-        name: 'youtube_transcript_fetch_start',
-        input: { url, video_id, lang }
-      });
-
       const response = await fetch(`https://www.youtube.com/watch?v=${video_id}`, {
         headers: { 'User-Agent': USER_AGENT }
       });
@@ -93,22 +87,8 @@ const youtubeService = {
 
       const full_text = transcript.map(chunk => chunk.text).join(' ');
 
-      span?.event({
-        name: 'youtube_transcript_fetch_success',
-        output: { 
-          transcript_length: full_text.length,
-          chunks_count: transcript.length
-        }
-      });
-
       return full_text;
     } catch (error) {
-      span?.event({
-        name: 'youtube_transcript_fetch_error',
-        input: { url, video_id },
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
       throw error;
     }
   }

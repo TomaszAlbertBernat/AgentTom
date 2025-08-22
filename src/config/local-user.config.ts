@@ -303,7 +303,6 @@ export const getApiKeyMetadata = (service: keyof LocalUserConfig['apiKeys']) => 
  * List all configured API keys with their metadata
  */
 export const listApiKeys = () => {
-  const config = loadLocalUserConfig();
   const services = ['google', 'openai', 'anthropic', 'xai', 'elevenlabs', 'resend', 'firecrawl', 'linear', 'spotify'] as const;
   
   return services.reduce((acc, service) => {

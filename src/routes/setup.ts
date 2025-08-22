@@ -141,7 +141,6 @@ setup.post('/test-api-key', zValidator('json', testKeySchema), async (c) => {
     const { service, key } = c.req.valid('json');
     
     // Temporarily set the key for testing (without saving)
-    const originalSetApiKey = require('../config/local-user.config').setApiKey;
     const originalGetApiKey = require('../config/local-user.config').getApiKey;
     
     // Mock the getApiKey function to return our test key

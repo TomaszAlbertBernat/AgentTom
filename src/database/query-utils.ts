@@ -5,7 +5,7 @@
  * implementing best practices for Drizzle ORM to improve performance.
  */
 
-import { SQL, SQLWrapper } from 'drizzle-orm';
+import { SQL } from 'drizzle-orm';
 import { logger } from '../services/common/logger.service';
 
 const queryLogger = logger.child('DB_QUERY');
@@ -126,7 +126,7 @@ export async function batchTransaction<T>(
   db: any,
   queries: (() => Promise<T>)[]
 ): Promise<T[]> {
-  return await db.transaction(async (tx: any) => {
+  return await db.transaction(async (_tx: any) => {
     const results: T[] = [];
     
     for (const query of queries) {

@@ -1,5 +1,4 @@
 import {z} from 'zod';
-import {LangfuseSpanClient} from 'langfuse';
 import {Client, TravelMode, PlaceInputType} from '@googlemaps/google-maps-services-js';
 import {stateManager} from '../agent/state.service';
 import {documentService} from '../agent/document.service';
@@ -63,7 +62,7 @@ const extractDirectionsInfo = (data: any) => {
 };
 
 const mapService = {
-  execute: async (action: string, payload: unknown, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  execute: async (action: string, payload: unknown): Promise<DocumentType> => {
     try {
       const state = stateManager.getState();
       const conversation_uuid = state.config.conversation_uuid ?? 'unknown';
@@ -72,11 +71,6 @@ const mapService = {
       if (!api_key) {
         throw new Error('Google Maps API key is not configured');
       }
-
-      span?.event({
-        name: 'map_tool_execute',
-        input: {action, payload}
-      });
 
       if (action === 'search_place') {
         const {query} = searchPlaceSchema.parse(payload);

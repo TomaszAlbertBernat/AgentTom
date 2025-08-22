@@ -1,8 +1,7 @@
-import { Langfuse, LangfuseTraceClient, LangfuseSpanClient, LangfuseGenerationClient } from 'langfuse';
+// Observer types simplified for local-first usage
 
-export type LangfuseState = {
-    langfuse: Langfuse;
-    traces: Map<string, LangfuseTraceClient>;
-    spans: Map<string, LangfuseSpanClient>;
-    generations: Map<string, LangfuseGenerationClient>;
-  };
+export type ObserverState = {
+    traces: Map<string, any>;
+    spans: Map<string, any>;
+    generations: Map<string, any>;
+};

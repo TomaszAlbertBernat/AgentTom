@@ -1,7 +1,7 @@
 import algoliasearch from 'algoliasearch';
 import { createLogger } from './logger.service';
 const algoliaLog = createLogger('AlgoliaService');
-import type { SearchIndex } from 'algoliasearch';
+
 import type { DocumentType } from '../agent/document.service';
 
 /**

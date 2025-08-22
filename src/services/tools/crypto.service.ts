@@ -1,6 +1,5 @@
 import {z} from 'zod';
-import {LangfuseSpanClient} from 'langfuse';
-import {stateManager} from '../agent/state.service';
+
 import {documentService} from '../agent/document.service';
 import type {DocumentType} from '../agent/document.service';
 
@@ -40,8 +39,7 @@ const cryptoPayloadSchema = z.object({
 
 const fetchSingleCryptoPrice = async (
   symbol: string,
-  amount: number = 1,
-  span?: LangfuseSpanClient
+  amount: number = 1
 ): Promise<ApiResponse> => {
   if (!API_KEY) {
     throw new Error('COIN_MARKET_CAP_API_KEY is not configured');
@@ -52,11 +50,6 @@ const fetchSingleCryptoPrice = async (
   url.searchParams.append('symbol', symbol);
   url.searchParams.append('convert', 'USD');
 
-  span?.event({
-    name: 'crypto_price_fetch_start',
-    input: { url: url.toString(), symbol, amount }
-  });
-
   const response = await fetch(url.toString(), {
     headers: {
       'X-CMC_PRO_API_KEY': API_KEY,
@@ -66,34 +59,22 @@ const fetchSingleCryptoPrice = async (
 
   if (!response.ok) {
     const error_text = await response.text();
-    span?.event({
-      name: 'crypto_price_fetch_error',
-      input: { symbol, amount },
-      output: { status: response.status, statusText: response.statusText, error: error_text },
-      level: 'ERROR'
-    });
     throw new Error(`Failed to fetch crypto prices: ${response.statusText} - ${error_text}`);
   }
 
   const data = await response.json();
-  span?.event({
-    name: 'crypto_price_fetch_success',
-    input: { symbol, amount },
-    output: { data }
-  });
 
   return data;
 };
 
 const fetchCryptoPrices = async (
   symbolsStr: string,
-  amount: number = 1,
-  span?: LangfuseSpanClient
+  amount: number = 1
 ): Promise<{ text: string; description: string }> => {
   const symbols = symbolsStr.trim().split(/\s+/);
-  
+
   const results = await Promise.all(
-    symbols.map(symbol => fetchSingleCryptoPrice(symbol, amount, span))
+    symbols.map(symbol => fetchSingleCryptoPrice(symbol, amount))
   );
   
   const prices = results.map(data => {
@@ -109,7 +90,7 @@ const fetchCryptoPrices = async (
 };
 
 const cryptoService = {
-  execute: async (action: string, payload: unknown, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  execute: async (action: string, payload: unknown): Promise<DocumentType> => {
     try {
       const {symbols, amount, conversation_uuid} = cryptoPayloadSchema.parse(payload);
       const symbol_list = symbols.trim().split(/\s+/).filter(Boolean);
@@ -122,7 +103,7 @@ const cryptoService = {
         });
       }
 
-      const {text, description} = await fetchCryptoPrices(symbols, amount, span);
+      const {text, description} = await fetchCryptoPrices(symbols, amount);
 
       return documentService.createDocument({
         conversation_uuid,

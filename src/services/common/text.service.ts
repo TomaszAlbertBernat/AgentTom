@@ -5,7 +5,7 @@
  * @module text.service
  */
 
-import {createByModelName} from '@microsoft/tiktokenizer';
+// Using simple token approximation instead of tiktokenizer for local-first simplicity
 import type {Document, DocumentMetadata} from '../../types/document';
 import {z} from 'zod';
 import { ValidationError } from '../../utils/errors';
@@ -30,13 +30,22 @@ const textServiceSchema = z.object({
 });
 
 /**
+ * Simplified token counting using approximation
+ * Approximates ~4 characters per token for English text
+ * @param text - Text to count tokens for
+ * @returns Approximate token count
+ */
+const approximateTokenCount = (text: string): number => {
+  // Simple approximation: ~4 characters per token for English text
+  return Math.ceil(text.length / 4);
+};
+
+/**
  * Interface for maintaining tokenizer state and model information
  * @interface TokenizerState
  */
 interface TokenizerState {
-  /** The initialized tokenizer instance */
-  tokenizer: Awaited<ReturnType<typeof createByModelName>> | undefined;
-  /** Name of the model being used */
+  /** Model name being used */
   model_name: string;
 }
 
@@ -48,45 +57,23 @@ interface TokenizerState {
 const formatForTokenization = (text: string): string => `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant<|im_end|>`;
 
 /**
- * Counts the number of tokens in a text string
- * @param {TokenizerState['tokenizer']} tokenizer - The tokenizer instance
+ * Counts the number of tokens in a text string using approximation
  * @param {string} text - The text to count tokens for
- * @returns {number} Number of tokens in the text
- * @throws {Error} When tokenizer is not initialized
+ * @returns {number} Approximate number of tokens in the text
  */
-const countTokens = (tokenizer: TokenizerState['tokenizer'], text: string): number => {
-  if (!tokenizer) {
-    throw new ValidationError('Tokenizer not initialized');
-  }
-  return tokenizer.encode(text, Array.from(SPECIAL_TOKENS.keys())).length;
+const countTokens = (text: string): number => {
+  return approximateTokenCount(text);
 };
 
 /**
- * Initializes or updates the tokenizer for a specific model
+ * Initializes tokenizer state for a specific model (simplified for local-first)
  * @param {TokenizerState} state - Current tokenizer state
  * @param {string} [model] - Optional model name to use
  * @returns {Promise<TokenizerState>} Updated tokenizer state
  */
-/**
- * Maps arbitrary provider model names to a tokenizer-supported model name.
- * Tokenizers are provider-specific; for unsupported models (e.g., Gemini),
- * we default to an OpenAI tokenizer that approximates token counts.
- */
-const normalizeModelForTokenizer = (modelName: string): string => {
-  // Use a stable tokenizer baseline; for non-OpenAI models, approximate with GPT tokenizer
-  const fallback = 'gpt-4o';
-  if (!modelName) return fallback;
-  return modelName.startsWith('gpt') ? modelName : fallback;
-};
-
 const initializeTokenizer = async (state: TokenizerState, model?: string): Promise<TokenizerState> => {
-  if (!state.tokenizer || model !== state.model_name) {
-    const model_name = model || state.model_name;
-    const tokenizerModel = normalizeModelForTokenizer(model_name);
-    const tokenizer = await createByModelName(tokenizerModel, SPECIAL_TOKENS);
-    return {tokenizer, model_name};
-  }
-  return state;
+  const model_name = model || state.model_name;
+  return { model_name };
 };
 
 /**
@@ -190,9 +177,9 @@ const DocumentSchema = z.object({
  * @param {number} limit - Maximum number of tokens allowed
  * @returns {{chunk_text: string, chunk_end: number}} Extracted chunk and end position
  */
-const getChunk = (tokenizer: TokenizerState['tokenizer'], text: string, start: number, limit: number): {chunk_text: string; chunk_end: number} => {
-  // Compute overhead once
-  const overhead = countTokens(tokenizer, formatForTokenization('')) - countTokens(tokenizer, '');
+const getChunk = (text: string, start: number, limit: number): {chunk_text: string; chunk_end: number} => {
+  // Compute overhead once (approximated)
+  const overhead = approximateTokenCount(formatForTokenization('')) - approximateTokenCount('');
   const maxPos = text.length;
 
   let low = start;
@@ -202,7 +189,7 @@ const getChunk = (tokenizer: TokenizerState['tokenizer'], text: string, start: n
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
     const candidateText = text.slice(start, mid);
-    const tokens = countTokens(tokenizer, candidateText) + overhead;
+    const tokens = countTokens(candidateText) + overhead;
 
     if (tokens <= limit) {
       bestFit = mid;
@@ -217,7 +204,7 @@ const getChunk = (tokenizer: TokenizerState['tokenizer'], text: string, start: n
     if (nextNewline !== -1 && nextNewline < maxPos) {
       const candidate = nextNewline + 1;
       const candidateText = text.slice(start, candidate);
-      const candidateTokens = countTokens(tokenizer, candidateText) + overhead;
+      const candidateTokens = countTokens(candidateText) + overhead;
       if (candidateTokens <= limit) return candidate;
     }
 
@@ -225,7 +212,7 @@ const getChunk = (tokenizer: TokenizerState['tokenizer'], text: string, start: n
     if (prevNewline > start) {
       const candidate = prevNewline + 1;
       const candidateText = text.slice(start, candidate);
-      const candidateTokens = countTokens(tokenizer, candidateText) + overhead;
+      const candidateTokens = countTokens(candidateText) + overhead;
       if (candidateTokens <= limit) return candidate;
     }
 
@@ -246,7 +233,7 @@ const getChunk = (tokenizer: TokenizerState['tokenizer'], text: string, start: n
  */
 export const createTextService = async (config: z.infer<typeof textServiceSchema>) => {
   let state: TokenizerState = {
-    tokenizer: undefined,
+    // tokenizer removed for local-first simplification
     model_name: textServiceSchema.parse(config).model_name
   };
 
@@ -270,8 +257,8 @@ export const createTextService = async (config: z.infer<typeof textServiceSchema
     let current_headers: Record<string, string[]> = {};
 
     while (position < text.length) {
-      const {chunk_text, chunk_end} = getChunk(state.tokenizer, text, position, limit);
-      const tokens = countTokens(state.tokenizer, chunk_text);
+      const {chunk_text, chunk_end} = getChunk(text, position, limit);
+      const tokens = countTokens(chunk_text);
 
       const headers_in_chunk = extractHeaders(chunk_text);
       current_headers = updateHeaders(current_headers, headers_in_chunk);
@@ -322,7 +309,7 @@ export const createTextService = async (config: z.infer<typeof textServiceSchema
  */
 export const createTokenizer = async (model_name: string = 'gemini-2.5-flash') => {
   const state: TokenizerState = {
-    tokenizer: undefined,
+    // tokenizer removed for local-first simplification
     model_name
   };
 
@@ -334,7 +321,7 @@ export const createTokenizer = async (model_name: string = 'gemini-2.5-flash') =
      * @param {string} text - Text to count tokens for
      * @returns {number} Number of tokens
      */
-    countTokens: (text: string) => countTokens(initialized_state.tokenizer, text),
+    countTokens: (text: string) => countTokens(text),
     /**
      * Formats text for tokenization with chat markers
      * @param {string} text - Text to format

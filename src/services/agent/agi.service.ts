@@ -3,7 +3,8 @@ import {stateManager} from '../../services/agent/state.service';
 import {conversationService} from '../../services/agent/conversation.service';
 import {messageService} from '../../services/agent/message.service';
 import {v4 as uuidv4} from 'uuid';
-import {CoreMessage, Message} from 'ai';
+import {CoreMessage} from 'ai';
+import {UIMessage} from 'ai';
 import {SetAssistantResponseParams} from '../../types/agi';
 import {toolService} from './tool.service';
 import {categoryService} from './category.service';
@@ -35,7 +36,7 @@ export const setInteractionState = async (request: ChatRequest) => {
 
   // Update interaction state with messages and tasks
   stateManager.updateInteraction({
-    messages: request.messages as Message[],
+    messages: request.messages as UIMessage[],
     tasks: tasks || []
   });
 
@@ -124,7 +125,7 @@ export const setAssistantResponse = async ({conversation_id, response, source = 
   // Update interaction state with new assistant message
   const current_state = stateManager.getState();
   stateManager.updateInteraction({
-    messages: [...current_state.interaction.messages, message as Message]
+    messages: [...current_state.interaction.messages, message as UIMessage]
   });
 
   stateManager.updateConfig({

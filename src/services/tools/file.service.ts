@@ -6,12 +6,11 @@
  */
 
 import {z} from 'zod';
-import {LangfuseSpanClient} from 'langfuse';
 import {stateManager} from '../agent/state.service';
 import {documentService} from '../agent/document.service';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import type {DocumentType} from '../agent/document.service';
-import {uploadFile, findFileByUuid} from '../common/upload.service';
+import {uploadFile} from '../common/upload.service';
 import {FileType} from '../../types/upload';
 import {createTextService} from '../common/text.service';
 import {webService} from './web.service';
@@ -23,8 +22,7 @@ import {
 import {completion, transcription} from '../common/llm.service';
 import {prompt as writePrompt} from '../../prompts/tools/file.write';
 import {v4 as uuidv4} from 'uuid';
-import { db } from '../../database';
-import { documents } from '../../schema/document';
+
 import {youtubeService} from './youtube.service';
 import { CoreMessage } from 'ai';
 import { env } from '../../config/env.config';
@@ -91,7 +89,7 @@ interface FileTypeHandler {
   /** Supported MIME types for this type */
   mimeTypes: string[];
   /** Function to load and process files of this type */
-  load: (url: string, span?: LangfuseSpanClient) => Promise<{content: string; mimeType: string; path: string}>;
+  load: (url: string) => Promise<{content: string; mimeType: string; path: string}>;
 }
 
 /**
@@ -106,19 +104,12 @@ const fileTypeHandlers: Record<string, FileTypeHandler> = {
     /**
      * Loads and processes text files from URLs
      * @param url - URL of the text file
-     * @param span - Optional Langfuse span for tracing
      * @returns Promise with file content, MIME type, and uploaded file path
      * @throws Error if file cannot be fetched or processed
      */
-    load: async (url: string, span?: LangfuseSpanClient) => {
+    load: async (url: string) => {
       const response = await fetch(url);
       if (!response.ok) {
-        span?.event({
-          name: 'text_file_fetch_error',
-          input: { url },
-          output: { status: response.status, statusText: response.statusText },
-          level: 'ERROR'
-        });
         throw new Error(`Failed to fetch text file: ${response.statusText}`);
       }
 
@@ -134,12 +125,6 @@ const fileTypeHandlers: Record<string, FileTypeHandler> = {
         file: new Blob([content], { type: mime_type }),
         type: FileType.TEXT,
         original_name: file_name
-      });
-
-      span?.event({
-        name: 'text_file_fetch_success',
-        input: { url },
-        output: { mime_type, file_name, size: content.length }
       });
 
       return {
@@ -166,24 +151,12 @@ const fileTypeHandlers: Record<string, FileTypeHandler> = {
     /**
      * Loads and transcribes audio files from URLs
      * @param url - URL of the audio file
-     * @param span - Optional Langfuse span for tracing
      * @returns Promise with transcribed content, MIME type, and uploaded file path
      * @throws Error if file cannot be fetched, uploaded, or transcribed
      */
-    load: async (url: string, span?: LangfuseSpanClient) => {
-      span?.event({
-        name: 'audio_file_fetch_start',
-        input: { url }
-      });
-
+    load: async (url: string) => {
       const response = await fetch(url);
       if (!response.ok) {
-        span?.event({
-          name: 'audio_file_fetch_error',
-          input: { url },
-          output: { status: response.status, statusText: response.statusText },
-          level: 'ERROR'
-        });
         throw new Error(`Failed to fetch audio file: ${response.statusText}`);
       }
 
@@ -204,17 +177,6 @@ const fileTypeHandlers: Record<string, FileTypeHandler> = {
       const transcribed_text = await transcription.fromBuffer(buffer, {
         language: 'en',
         prompt: `Transcription of ${file_name}`
-      });
-
-      span?.event({
-        name: 'audio_file_fetch_success',
-        input: { url },
-        output: { 
-          mime_type, 
-          file_name, 
-          size: buffer.length,
-          transcription_length: transcribed_text.length 
-        }
       });
 
       return {
@@ -273,27 +235,15 @@ const fileService = {
    * const doc = await fileService.load('https://youtube.com/watch?v=xyz', 'conv-123');
    * ```
    */
-  load: async (path: string, conversation_uuid: string, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  load: async (path: string, conversation_uuid: string): Promise<DocumentType> => {
     try {
       const is_url = isValidUrl(path);
       const is_youtube = is_url && youtubeService.isYoutubeUrl(path);
       const is_direct_file = is_url && !is_youtube && isDirectFileUrl(path);
 
-      span?.event({
-        name: 'file_load_attempt',
-        input: {
-          path,
-          type: is_url ? 
-            (is_youtube ? 'youtube_url' : 
-             is_direct_file ? 'direct_file_url' : 
-             'webpage_url') : 
-            'local_path'
-        }
-      });
-
       if (is_url) {
         if (is_youtube) {
-          const transcript = await youtubeService.getTranscript(path, 'en', span);
+          const transcript = await youtubeService.getTranscript(path, 'en');
           const [tokenized_content] = await text_service.split(transcript, Infinity);
 
           return documentService.createDocument({
@@ -314,7 +264,7 @@ const fileService = {
         }
 
         if (!is_direct_file) {
-          return webService.getContents(path, conversation_uuid, span);
+          return webService.getContents(path, conversation_uuid);
         }
 
         const file_type = getFileTypeFromUrl(path);
@@ -323,7 +273,7 @@ const fileService = {
         }
 
         const handler = fileTypeHandlers[file_type];
-        const {content, mimeType, path: stored_path} = await handler.load(path, span);
+        const {content, mimeType, path: stored_path} = await handler.load(path);
         const [tokenized_content] = await text_service.split(content, Infinity);
 
         return documentService.createDocument({
@@ -345,13 +295,6 @@ const fileService = {
         throw new ValidationError('Local path loading not implemented', { context: { path } });
       }
     } catch (error) {
-      span?.event({
-        name: 'file_load_error',
-        input: { path },
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
-
       return documentService.createErrorDocument({
         error,
         conversation_uuid,
@@ -374,7 +317,7 @@ const fileService = {
    * console.log(`Uploaded file: ${doc.metadata.name}`);
    * ```
    */
-  uploadFile: async (file_path: string, content: string, conversation_uuid: string, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  uploadFile: async (file_path: string, content: string, conversation_uuid: string): Promise<DocumentType> => {
     try {
       const blob = new Blob([content], {type: 'text/plain'});
       const upload_result = await uploadFile({
@@ -385,12 +328,6 @@ const fileService = {
       });
 
       const [tokenized_content] = await text_service.split(content, Infinity);
-
-      span?.event({
-        name: 'file_upload',
-        input: {file_path},
-        output: {success: true, upload_result}
-      });
 
       return documentService.createDocument({
         conversation_uuid,
@@ -407,13 +344,6 @@ const fileService = {
         }
       });
     } catch (error) {
-      span?.event({
-        name: 'file_upload_error',
-        input: { file_path },
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
-
       return documentService.createErrorDocument({
         error,
         conversation_uuid,
@@ -441,7 +371,7 @@ const fileService = {
    * console.log(`Generated file: ${doc.metadata.name}`);
    * ```
    */
-  write: async (query: string, context_uuids: string[], conversation_uuid: string, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  write: async (query: string, context_uuids: string[], conversation_uuid: string): Promise<DocumentType> => {
     try {
       // Load context documents
       const context_docs = await Promise.all(
@@ -457,17 +387,9 @@ const fileService = {
       );
 
       // Restore placeholders in context documents
-      const restored_context = context_docs.map(doc => 
+      const restored_context = context_docs.map(doc =>
         documentService.restorePlaceholders(doc)
       );
-
-      span?.event({
-        name: 'file_write_start',
-        input: { 
-          query,
-          context_count: context_uuids.length 
-        }
-      });
 
       const state = stateManager.getState();
 
@@ -481,13 +403,6 @@ const fileService = {
           content: `Context documents:\n${restored_context.map(doc => doc.text).join('\n\n')}\n\nQuery: ${query}`
         }
       ];
-      
-      // Start generation tracking
-      const file_generation = span?.generation({
-        name: 'file_content_generation',
-        input: writing_messages,
-        model: state.config.model
-      });
 
       // Generate content using LLM
       const result = await completion.object<{ name: string; content: string }>({
@@ -495,15 +410,6 @@ const fileService = {
         messages: writing_messages,
         temperature: 0.7,
         user: { uuid: conversation_uuid, name: 'file_write_tool' }
-      });
-
-      // End generation tracking
-      await file_generation?.end({
-        output: {
-          generated_name: result.name,
-          result_content: result.content,
-          content_length: result.content.length,
-        }
       });
 
       // Replace context references if any
@@ -532,16 +438,6 @@ const fileService = {
         original_name: file_name
       });
 
-      span?.event({
-        name: 'file_write_complete',
-        output: { 
-          file_name,
-          content_length: processed_content.length,
-          upload_path: upload_result.path,
-          mime_type: document_mime_type
-        }
-      });
-
       return documentService.createDocument({
         uuid,
         conversation_uuid,
@@ -558,13 +454,6 @@ const fileService = {
       });
 
     } catch (error) {
-      span?.event({
-        name: 'file_write_error',
-        input: { query },
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
-
       return documentService.createErrorDocument({
         error,
         conversation_uuid,
@@ -601,27 +490,22 @@ const fileService = {
    * });
    * ```
    */
-  execute: async (action: string, payload: unknown, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  execute: async (action: string, payload: unknown): Promise<DocumentType> => {
     try {
       const state = stateManager.getState();
       const conversation_uuid = state.config.conversation_uuid ?? 'unknown';
-
-      span?.event({
-        name: 'file_tool_execute',
-        input: { action, payload }
-      });
 
       const validatedPayload = filePayloadSchema.parse({ action, payload });
 
       switch (validatedPayload.action) {
         case 'write': {
-          return fileService.write(validatedPayload.payload.query, validatedPayload.payload.context, conversation_uuid, span);
+          return fileService.write(validatedPayload.payload.query, validatedPayload.payload.context, conversation_uuid);
         }
         case 'load': {
-          return fileService.load(validatedPayload.payload.path, conversation_uuid, span);
+          return fileService.load(validatedPayload.payload.path, conversation_uuid);
         }
         case 'upload': {
-          return fileService.uploadFile(validatedPayload.payload.path, validatedPayload.payload.content, conversation_uuid, span);
+          return fileService.uploadFile(validatedPayload.payload.path, validatedPayload.payload.content, conversation_uuid);
         }
         default:
           return documentService.createErrorDocument({

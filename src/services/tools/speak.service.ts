@@ -1,5 +1,4 @@
 import {z} from 'zod';
-import {LangfuseSpanClient} from 'langfuse';
 import {promisify} from 'util';
 import {exec as execCallback} from 'child_process';
 import {writeFile, unlink} from 'fs/promises';
@@ -22,45 +21,28 @@ const speakPayloadSchema = z.object({
 
 const text_service = await createTextService({model_name: env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash'});
 
-const playAudioBuffer = async (buffer: Buffer, span?: LangfuseSpanClient): Promise<void> => {
+const playAudioBuffer = async (buffer: Buffer): Promise<void> => {
   const temp_file = join(tmpdir(), `speech-${Date.now()}.mp3`);
   
   try {
     await writeFile(temp_file, buffer);
     await exec(`afplay "${temp_file}"`);
   } catch (error) {
-    span?.event({
-      name: 'audio_playback_error',
-      input: { file: temp_file },
-      output: { error: error instanceof Error ? error.message : 'Unknown error' },
-      level: 'ERROR'
-    });
     throw error;
   } finally {
     await unlink(temp_file).catch(() => {});
   }
 };
 
-const speakText = async (text: string, span?: LangfuseSpanClient): Promise<void> => {
+const speakText = async (text: string): Promise<void> => {
   try {
     await exec(`say "${text.replace(/"/g, '\\"')}"`);
-    
-    span?.event({
-      name: 'system_speak_success',
-      input: { text }
-    });
   } catch (error) {
-    span?.event({
-      name: 'system_speak_error',
-      input: { text },
-      output: { error: error instanceof Error ? error.message : 'Unknown error' },
-      level: 'ERROR'
-    });
     throw error;
   }
 };
 
-const speakWithElevenLabs = async (text: string, voice?: string, span?: LangfuseSpanClient): Promise<void> => {
+const speakWithElevenLabs = async (text: string, voice?: string): Promise<void> => {
   try {
     const audio_stream = await elevenlabsService.speak(text, voice);
     const chunks: Buffer[] = [];
@@ -70,39 +52,23 @@ const speakWithElevenLabs = async (text: string, voice?: string, span?: Langfuse
     }
     
     const audio_buffer = Buffer.concat(chunks);
-    await playAudioBuffer(audio_buffer, span);
-    
-    span?.event({
-      name: 'elevenlabs_speak_success',
-      input: { text, voice }
-    });
+    await playAudioBuffer(audio_buffer);
   } catch (error) {
-    span?.event({
-      name: 'elevenlabs_speak_error',
-      input: { text, voice },
-      output: { error: error instanceof Error ? error.message : 'Unknown error' },
-      level: 'ERROR'
-    });
     throw error;
   }
 };
 
 const speakService = {
-  execute: async (action: string, payload: unknown, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  execute: async (action: string, payload: unknown): Promise<DocumentType> => {
     try {
       const state = stateManager.getState();
       const {text, voice, mode} = speakPayloadSchema.parse(payload);
       const conversation_uuid = state.config.conversation_uuid ?? 'unknown';
 
-      span?.event({
-        name: 'notification_execute',
-        input: { action, text, mode, voice }
-      });
-
       if (action === 'speak') {
-        await (mode === 'elevenlabs' ? 
-          speakWithElevenLabs(text, voice, span) : 
-          speakText(text, span)
+        await (mode === 'elevenlabs' ?
+          speakWithElevenLabs(text, voice) :
+          speakText(text)
         );
 
         return documentService.createDocument({

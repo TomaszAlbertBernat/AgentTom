@@ -7,14 +7,13 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { 
-  loadLocalUserConfig, 
-  saveLocalUserConfig, 
-  getApiKey, 
-  setApiKey, 
+import {
+  loadLocalUserConfig,
+  saveLocalUserConfig,
+  setApiKey,
   deleteApiKey,
-  getUserPreferences, 
-  updateUserPreferences, 
+  getUserPreferences,
+  updateUserPreferences,
   getLocalUser,
   listApiKeys,
   getApiKeyMetadata,

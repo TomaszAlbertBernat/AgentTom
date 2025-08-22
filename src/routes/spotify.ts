@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { AppEnv } from '../types/hono';
 import { spotifyService } from '../services/tools/spotify.service';
-import { findByUUID } from '../services/common/user.service';
 import { randomBytes } from 'crypto';
+
 
 const media = new Hono<AppEnv>()
   .post('/search', async c => {

@@ -1,4 +1,3 @@
-import {type ChatRequest} from '../dto/chat.dto';
 import type {CoreMessage} from 'ai';
 
 export interface CompletionConfig {

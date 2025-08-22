@@ -36,7 +36,7 @@ logger.startup(`Environment: ${env.NODE_ENV}`);
 memoryTracker.logMemoryUsage();
 
 // Set up periodic memory checks
-const memoryCheckId = timerRegistry.setInterval(() => {
+const _memoryCheckId = timerRegistry.setInterval(() => {
   memoryTracker.logDetailedMemoryUsage();
 }, MEMORY_CHECK_INTERVAL);
 

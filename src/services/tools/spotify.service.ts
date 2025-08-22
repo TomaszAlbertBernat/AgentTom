@@ -1,11 +1,9 @@
 import {SpotifyApi, AccessToken} from '@spotify/web-api-ts-sdk';
-import {LangfuseSpanClient} from 'langfuse';
 import {z} from 'zod';
 import {stateManager} from '../agent/state.service';
 import {TokenResponse, SimplifiedSearchResults, SimplifiedTrack, SimplifiedPlaylist, SimplifiedAlbum} from '../../types/tools/spotify';
 import {prompt as spotifyPlayPrompt} from '../../prompts/tools/spotify.play';
 import {completion} from '../common/llm.service';
-import {CoreMessage} from 'ai';
 import {DocumentMetadata} from '../../types/document';
 import {documentService} from '../agent/document.service';
 import type {DocumentType} from '../agent/document.service';
@@ -143,7 +141,7 @@ const spotifyService = {
     return SpotifyApi.withAccessToken(env.SPOTIFY_CLIENT_ID, access_token);
   },
 
-  search: async (query: string, types: Array<'album' | 'artist' | 'playlist' | 'track'>, limit: number = 5, span?: LangfuseSpanClient): Promise<SimplifiedSearchResults> => {
+  search: async (query: string, types: Array<'album' | 'artist' | 'playlist' | 'track'>, limit: number = 5): Promise<SimplifiedSearchResults> => {
     try {
       const state = stateManager.getState();
       if (!state.config.user_uuid) {
@@ -185,12 +183,6 @@ const spotifyService = {
           }))
       };
     } catch (error) {
-      span?.event({
-        name: 'spotify_search_error',
-        input: {query, types},
-        output: {error: error instanceof Error ? error.message : 'Unknown error'},
-        level: 'ERROR'
-      });
       throw error;
     }
   },
@@ -218,7 +210,7 @@ const spotifyService = {
     return device_id;
   },
 
-  playTrack: async (uri: string, span?: LangfuseSpanClient): Promise<void> => {
+  playTrack: async (uri: string): Promise<void> => {
     try {
       const state = stateManager.getState();
       if (!state.config.user_uuid) {
@@ -230,32 +222,7 @@ const spotifyService = {
       const device_id = await spotifyService.getActiveDevice();
 
       await spotify_client.player.startResumePlayback(device_id, undefined, [uri]);
-
-      span?.event({
-        name: 'spotify_playback',
-        input: {
-          content_type: 'track',
-          uri,
-          device_id
-        },
-        output: {
-          status: 'success',
-          device_name: devices.devices.find(d => d.id === device_id)?.name
-        }
-      });
     } catch (error) {
-      span?.event({
-        name: 'spotify_playback_error',
-        input: {
-          content_type: 'track',
-          uri
-        },
-        output: {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          error_code: error instanceof Error ? error.name : 'UnknownError'
-        },
-        level: 'ERROR'
-      });
       throw error;
     }
   },
@@ -284,22 +251,9 @@ const spotifyService = {
     await spotify_client.player.startResumePlayback(device_id, uri);
   },
 
-  select: async (results: SimplifiedSearchResults, query: string, span?: LangfuseSpanClient): Promise<string> => {
+  select: async (results: SimplifiedSearchResults, query: string): Promise<string> => {
     try {
       const state = stateManager.getState();
-
-      const selection_generation = span?.generation({
-        name: 'spotify_track_selection',
-        input: {
-          query,
-          available_results: {
-            tracks: results.tracks.map(t => ({name: t.name, artists: t.artists})),
-            playlists: results.playlists.map(p => ({name: p.name, owner: p.owner})),
-            albums: results.albums.map(a => ({name: a.name, artists: a.artists}))
-          }
-        },
-        model: state.config.model
-      });
 
       const decision = await completion.object<{result: string}>({
         // NOTE: Never use 'gemini-2.0-flash'.
@@ -324,52 +278,17 @@ const spotifyService = {
         ? results.albums.find((item: SimplifiedAlbum) => item.uri === decision.result)
         : undefined;
 
-      await selection_generation?.end({
-        output: {
-          selected_uri: decision.result,
-          content_type: decision.result.split(':')[1],
-          selected_item
-        }
-      });
-
-      span?.event({
-        name: 'spotify_content_selected',
-        input: {
-          query,
-          available_results: {
-            tracks: results.tracks.length,
-            playlists: results.playlists.length,
-            albums: results.albums.length
-          }
-        },
-        output: {
-          selected_uri: decision.result,
-          content_type: decision.result.split(':')[1],
-          selected_item
-        }
-      });
-
       return decision.result;
     } catch (error) {
-      span?.event({
-        name: 'spotify_selection_error',
-        input: {query},
-        output: {error: error instanceof Error ? error.message : 'Unknown error'},
-        level: 'ERROR'
-      });
       throw error;
     }
   },
 
-  playMusic: async (query: string, conversation_uuid: string, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  playMusic: async (query: string, conversation_uuid: string): Promise<DocumentType> => {
     try {
-      const search_results = await spotifyService.search(query, ['track', 'playlist', 'album'], 15, span);
+      const search_results = await spotifyService.search(query, ['track', 'playlist', 'album'], 15);
 
       if (!search_results.tracks.length && !search_results.playlists.length && !search_results.albums.length) {
-        span?.event({
-          name: 'spotify_no_results',
-          input: {query}
-        });
         return documentService.createDocument({
           conversation_uuid,
           source_uuid: conversation_uuid,
@@ -381,13 +300,9 @@ const spotifyService = {
         });
       }
 
-      const spotify_uri = await spotifyService.select(search_results, query, span);
+      const spotify_uri = await spotifyService.select(search_results, query);
 
       if (spotify_uri === 'no match') {
-        span?.event({
-          name: 'spotify_no_match',
-          input: {query}
-        });
         return documentService.createDocument({
           conversation_uuid,
           source_uuid: conversation_uuid,
@@ -400,21 +315,7 @@ const spotifyService = {
       }
 
       const [_, content_type, content_id] = spotify_uri.split(':');
-      const response = await spotifyService.handleContentPlay(content_type, spotify_uri, search_results, span);
-
-      span?.event({
-        name: 'spotify_play_success',
-        input: {
-          query,
-          content_type,
-          uri: spotify_uri
-        },
-        output: {
-          content_name: response.metadata.name,
-          content_description: response.metadata.description,
-          response_text: response.text
-        }
-      });
+      const response = await spotifyService.handleContentPlay(content_type, spotify_uri, search_results);
 
       return documentService.createDocument({
         conversation_uuid,
@@ -427,12 +328,6 @@ const spotifyService = {
         }
       });
     } catch (error) {
-      span?.event({
-        name: 'spotify_play_error',
-        input: {query},
-        output: {error: error instanceof Error ? error.message : 'Unknown error'},
-        level: 'ERROR'
-      });
       return documentService.createDocument({
         conversation_uuid,
         source_uuid: conversation_uuid,
@@ -445,10 +340,10 @@ const spotifyService = {
     }
   },
 
-  handleContentPlay: async (content_type: string, uri: string, search_results: SimplifiedSearchResults, span?: LangfuseSpanClient): Promise<ToolResponse> => {
+  handleContentPlay: async (content_type: string, uri: string, search_results: SimplifiedSearchResults): Promise<ToolResponse> => {
     switch (content_type) {
       case 'track': {
-        await spotifyService.playTrack(uri, span);
+        await spotifyService.playTrack(uri);
         const selected_track = search_results.tracks.find(track => track.uri === uri);
         return {
           text: `Now playing: "${selected_track?.name}" by ${selected_track?.artists}`,
@@ -491,9 +386,9 @@ const spotifyService = {
     }
   },
 
-  searchMusic: async (query: string, conversation_uuid: string, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  searchMusic: async (query: string, conversation_uuid: string): Promise<DocumentType> => {
     try {
-      const search_results = await spotifyService.search(query, ['track', 'playlist', 'album'], 15, span);
+      const search_results = await spotifyService.search(query, ['track', 'playlist', 'album'], 15);
       
       let content = 'Spotify Search Results (if you need to play music, pick one of the results in the next action you need to take):\n\n';
 
@@ -533,12 +428,6 @@ const spotifyService = {
         }
       });
     } catch (error) {
-      span?.event({
-        name: 'spotify_search_error',
-        input: {query, types: ['track', 'playlist', 'album']},
-        output: {error: error instanceof Error ? error.message : 'Unknown error'},
-        level: 'ERROR'
-      });
       return documentService.createDocument({
         conversation_uuid,
         source_uuid: conversation_uuid,
@@ -551,20 +440,14 @@ const spotifyService = {
     }
   },
 
-  execute: async (action: string, payload: any, span?: LangfuseSpanClient) => {
+  execute: async (action: string, payload: any) => {
     const state = stateManager.getState();
 
-    span?.event({
-      name: 'spotify_tool',
-      input: { action, query: payload.query, conversation_uuid: state.config.conversation_uuid },
-      output: { success: true, action_executed: action }
-    });
-
     if (action === 'play_music') {
-      return spotifyService.playMusic(payload.query, state.config.conversation_uuid ?? 'unknown', span);
+      return spotifyService.playMusic(payload.query, state.config.conversation_uuid ?? 'unknown');
     }
     if (action === 'search_music') {
-      return spotifyService.searchMusic(payload.query, state.config.conversation_uuid ?? 'unknown', span);
+      return spotifyService.searchMusic(payload.query, state.config.conversation_uuid ?? 'unknown');
     }
 
     throw new Error(`Unknown action: ${action}`);

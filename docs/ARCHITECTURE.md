@@ -1,6 +1,6 @@
-# Architecture
+# Architecture - Simplified for Local-First Use
 
-How AgentTom is built and organized.
+How AgentTom is built and organized for local-first, personal use case.
 
 ## 🏗️ System Overview
 
@@ -180,6 +180,57 @@ File Upload → MIME Validation → Storage → Database Record → File URL
 2. Define interface and implementation
 3. Add configuration and environment variables
 4. Write unit tests
+
+## 🔄 Simplified Architecture Recommendations
+
+### Phase 1: Immediate Simplifications
+- **Remove Redis dependency** - Replace with in-memory rate limiting
+- **Consolidate route modules** - Merge unused/unnecessary API endpoints
+- **Streamline middleware** - Remove complex CORS, sanitization for local use
+- **Simplify configuration** - Reduce environment variables to essentials
+
+### Phase 2: Frontend Modernization
+- **Replace Next.js with Vite** - Simpler build tool for local development
+- **Flatten routing structure** - Remove complex nested routes
+- **Consolidate components** - Merge duplicate UI components
+- **Remove unused pages** - Eliminate multi-user specific routes
+
+### Phase 3: Service Optimization
+- **Reduce AI providers** - Keep Google Gemini primary, optional OpenAI fallback
+- **Remove Langfuse** - Eliminate AI observability overhead
+- **Simplify external services** - Make most integrations optional
+- **Streamline database operations** - Reduce migration complexity
+
+### Target Simplified Architecture
+
+```
+AgentTom (Simplified)
+├── Backend (Bun + Hono + SQLite)
+│   ├── Core API Routes (consolidated)
+│   ├── Essential Middleware (auth, validation)
+│   ├── AI Service (Gemini primary)
+│   └── Database (SQLite + Drizzle)
+├── Frontend (Vite + React + TypeScript)
+│   ├── Simple routing (flat structure)
+│   ├── Core components (chat, tools, files)
+│   └── State management (TanStack Query)
+└── Configuration (minimal .env)
+    ├── GOOGLE_API_KEY (required)
+    ├── OPENAI_API_KEY (optional)
+    └── DATABASE_PATH (local SQLite)
+```
+
+### Benefits of Simplified Architecture
+- **Faster startup** - Reduced initialization overhead
+- **Lower memory usage** - Fewer services running
+- **Simpler debugging** - Less complexity to troubleshoot
+- **Easier maintenance** - Fewer moving parts
+- **Better local performance** - Optimized for single-user scenario
+
+### Migration Strategy
+1. **Phase 1 (Low Risk)**: Remove unused dependencies, simplify config
+2. **Phase 2 (Medium Risk)**: Replace Next.js with Vite, consolidate routes
+3. **Phase 3 (High Risk)**: Major framework changes, database simplification
 
 ---
 

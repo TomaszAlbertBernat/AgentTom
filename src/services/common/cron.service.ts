@@ -5,13 +5,13 @@
  * @module cron.service
  */
 
-import { eq, and, lte, isNull } from 'drizzle-orm';
+import { eq, and, lte } from 'drizzle-orm';
 import parser from 'cron-parser';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../../database';
 import { jobs } from '../../schema/jobs';
 import type { Job, NewJob } from '../../schema/jobs';
-import type { Task } from '../../schema/task';
+
 import { taskService } from '../agent/task.service';
 import { conversationService } from '../agent/conversation.service';
 import { createLogger } from './logger.service';
@@ -179,7 +179,7 @@ export const cronService = {
       this.log.debug(`Job ${job.uuid} marked as running`);
 
       const conversation_uuid = uuidv4();
-      const task = await taskService.createTasks(conversation_uuid, [{
+      const _task = await taskService.createTasks(conversation_uuid, [{
         name: job.name,
         description: typeof job.metadata === 'string' 
           ? (JSON.parse(job.metadata) as { description?: string })?.description || ''

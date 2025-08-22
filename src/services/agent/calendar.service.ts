@@ -2,7 +2,6 @@ import {z} from 'zod';
 import fs from 'fs/promises';
 import {google, calendar_v3} from 'googleapis';
 import {OAuth2Client} from 'google-auth-library';
-import {LangfuseSpanClient} from 'langfuse';
 import {documentService} from './document.service';
 import {stateManager} from './state.service';
 import type {DocumentType} from './document.service';
@@ -362,7 +361,7 @@ const calendarService = {
 
       switch (action) {
         case 'create_event': {
-          const event = await createEvent(calendar, payload as z.infer<typeof eventSchema>, span);
+          const event = await createEvent(calendar, payload as z.infer<typeof eventSchema>);
           const event_text = JSON.stringify(event, null, 2);
           const [tokenized_content] = await text_service.split(event_text, Infinity);
           
@@ -383,7 +382,7 @@ const calendarService = {
         }
 
         case 'update_event': {
-          const event = await updateEvent(calendar, payload as z.infer<typeof eventUpdateSchema>, span);
+          const event = await updateEvent(calendar, payload as z.infer<typeof eventUpdateSchema>);
           const event_text = JSON.stringify(event, null, 2);
           const [tokenized_content] = await text_service.split(event_text, Infinity);
 
@@ -404,7 +403,7 @@ const calendarService = {
         }
 
         case 'search_events': {
-          const events_xml = await searchEvents(calendar, payload as z.infer<typeof eventSearchSchema>, span);
+          const events_xml = await searchEvents(calendar, payload as z.infer<typeof eventSearchSchema>);
           const [tokenized_content] = await text_service.split(events_xml, Infinity);
 
           return documentService.createDocument({
@@ -445,7 +444,7 @@ const calendarService = {
 
         case 'handle_auth': {
           const code = z.string().parse(payload);
-          const tokens = await handleCallback(auth, code, span);
+          const tokens = await handleCallback(auth, code);
           const tokens_text = JSON.stringify(tokens);
           const [tokenized_content] = await text_service.split(tokens_text, Infinity);
           
@@ -499,7 +498,7 @@ const calendarService = {
       timeMin,
       timeMax,
       maxResults: 50 // Reasonable limit for context
-    }, span);
+    });
   }
 };
 

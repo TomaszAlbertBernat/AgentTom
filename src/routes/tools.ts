@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../database';
-import { tools } from '../schema/tool';
+
 import { tool_executions } from '../schema/tool_executions';
-import { eq, desc } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { toolsMap, validateToolPayload } from '../config/tools.config';
 import { createLogger } from '../services/common/logger.service';
 
@@ -315,7 +315,7 @@ async function logExecution(
   error?: ToolError | null,
   start_time?: number,
   result?: any,
-  execution_time?: number
+  _execution_time?: number
 ) {
   try {
     const execution_data = {

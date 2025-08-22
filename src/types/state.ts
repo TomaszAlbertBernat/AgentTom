@@ -1,4 +1,4 @@
-import {CoreMessage, Message} from 'ai';
+import {UIMessage} from 'ai';
 import {Memory, Task, Tool} from './agent';
 import { DocumentType } from '../services/agent/document.service';
 
@@ -40,7 +40,7 @@ export interface State {
   };
   interaction: {
     tasks: Task[];
-    messages: Message[];
+    messages: UIMessage[];
     tool_context: DocumentType[];
   };
   session: {

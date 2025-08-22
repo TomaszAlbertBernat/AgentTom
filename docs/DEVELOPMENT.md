@@ -1,6 +1,6 @@
-# Development Guide
+# Development Guide - Simplified for Local-First
 
-Essential guidelines for developing AgentTom.
+Essential guidelines for developing AgentTom with simplified local-first approach.
 
 ## 🎯 Core Principles
 
@@ -351,6 +351,77 @@ bun test  # Ensure nothing broke
 bun test --coverage
 bun run build
 ```
+
+## 🚀 Simplified Development Workflow
+
+### Quick Start (Simplified)
+```bash
+# 1. Clone and install
+git clone [repo]
+cd AgentTom
+bun install
+
+# 2. Configure (minimal setup)
+echo "GOOGLE_API_KEY=your_gemini_key" > .env
+echo "DATABASE_PATH=./data/agentom.db" >> .env
+
+# 3. Run migrations and start
+bun run migrate
+bun run dev
+```
+
+### Simplified Configuration
+```bash
+# Essential environment variables only
+GOOGLE_API_KEY=your_gemini_key          # Required - Gemini AI
+OPENAI_API_KEY=your_openai_key          # Optional - Fallback AI
+DATABASE_PATH=./data/agentom.db         # Local SQLite path
+
+# Optional services (can be added later)
+# LINEAR_API_KEY=...
+# SPOTIFY_CLIENT_ID=...
+```
+
+### Development Commands (Simplified)
+```bash
+# Core development
+bun run dev          # Start dev server
+bun run build        # Type check only
+bun test             # Run unit tests
+
+# Database
+bun run migrate      # Run migrations
+bun run seed         # Seed development data
+
+# Code quality
+bun test --coverage  # Test with coverage
+```
+
+### Simplified Testing Strategy
+- **Focus on unit tests** for core business logic
+- **Basic E2E tests** for critical user flows
+- **Integration tests** only for essential API endpoints
+- **Remove complex test suites** for unused features
+
+### Simplified Onboarding
+1. **Clone repository** - Single git clone command
+2. **Install dependencies** - `bun install` only
+3. **Add API key** - One environment variable
+4. **Run migrations** - `bun run migrate`
+5. **Start development** - `bun run dev`
+
+### Tooling Simplification
+- **Build tool**: Replace Next.js with Vite
+- **Testing**: Focus on Bun test + essential Playwright
+- **Linting**: Keep TypeScript compiler + basic ESLint
+- **Dependencies**: Remove unused packages
+
+### Local Development Benefits
+- **Faster startup** - Reduced initialization time
+- **Simpler debugging** - Fewer services to troubleshoot
+- **Lower resource usage** - Less memory and CPU overhead
+- **Easier configuration** - Minimal environment setup
+- **Better performance** - Optimized for local single-user scenario
 
 ## 🤝 Getting Help
 

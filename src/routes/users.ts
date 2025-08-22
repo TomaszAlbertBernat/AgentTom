@@ -6,11 +6,10 @@ import { db } from '../database';
 import { users } from '../schema/user';
 import { eq } from 'drizzle-orm';
 import type { AppEnv } from '../types/hono';
-import { 
-  selectColumns, 
-  getPaginationParams, 
-  measureQueryTime, 
-  PaginationOptions 
+import {
+  selectColumns,
+  getPaginationParams,
+  measureQueryTime
 } from '../database/query-utils';
 import { logger } from '../services/common/logger.service';
 

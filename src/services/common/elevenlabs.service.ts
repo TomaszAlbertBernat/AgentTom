@@ -6,19 +6,11 @@
  */
 
 import {z} from 'zod';
-import {LangfuseSpanClient} from 'langfuse';
 import {ElevenLabsClient} from 'elevenlabs';
 import { createLogger } from './logger.service';
 const ttsLog = createLogger('ElevenLabs');
 
-/**
- * Zod schema for ElevenLabs configuration validation
- * @constant {z.ZodSchema}
- */
-const elevenlabsConfigSchema = z.object({
-  /** ElevenLabs API key */
-  api_key: z.string()
-});
+
 
 /**
  * Zod schema for speech generation configuration
@@ -62,25 +54,15 @@ const elevenlabsService = {
    * @throws {Error} When text-to-speech generation fails
    */
   speak: async (
-    text: string, 
-    voice?: string, 
-    model_id?: string, 
-    span?: LangfuseSpanClient
+    text: string,
+    voice?: string,
+    model_id?: string
   ): Promise<AsyncIterable<Uint8Array>> => {
     try {
       const config = speechConfigSchema.parse({
         text,
         voice,
         model_id
-      });
-
-      span?.event({
-        name: 'elevenlabs_generate_start',
-        input: {
-          text: config.text,
-          voice: config.voice,
-          model_id: config.model_id
-        }
       });
 
       const audio_stream = await client.generate({
@@ -90,24 +72,8 @@ const elevenlabsService = {
         stream: true
       });
 
-      span?.event({
-        name: 'elevenlabs_generate_success',
-        input: {
-          text: config.text,
-          voice: config.voice,
-          model_id: config.model_id
-        }
-      });
-
       return audio_stream;
     } catch (error) {
-      span?.event({
-        name: 'elevenlabs_generate_error',
-        input: { text, voice, model_id },
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
-      
       throw error;
     }
   }

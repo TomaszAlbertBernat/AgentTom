@@ -13,7 +13,7 @@ export default function QueryProvider({ children }: PropsWithChildren<{}>) {
             staleTime: 30_000,
             gcTime: 5 * 60_000,
             refetchOnWindowFocus: false,
-            retry: (failureCount, error) => {
+            retry: (_failureCount, _error) => {
               // Don't retry on certain error types
               const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -33,7 +33,7 @@ export default function QueryProvider({ children }: PropsWithChildren<{}>) {
             retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
           },
           mutations: {
-            retry: (failureCount, error) => {
+            retry: (_failureCount, _error) => {
               // Don't retry mutations by default (they usually have side effects)
               return false;
             },
@@ -50,7 +50,7 @@ export default function QueryProvider({ children }: PropsWithChildren<{}>) {
           },
         }),
         mutationCache: new MutationCache({
-          onError: (error, variables, context, mutation) => {
+          onError: (_error, _variables, _context, mutation) => {
             // Always show toast for mutations since they are user-initiated
             showErrorToast(error, {
               description: `Operation failed: ${mutation.options.mutationKey?.[0] || 'Unknown'}`,

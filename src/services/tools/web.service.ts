@@ -10,7 +10,6 @@
 import FirecrawlApp from '@mendable/firecrawl-js';
 import {z} from 'zod';
 import {v4 as uuidv4} from 'uuid';
-import {LangfuseSpanClient} from 'langfuse';
 import {documentService} from '../agent/document.service';
 import {createTokenizer} from '../common/text.service';
 import { ValidationError } from '../../utils/errors';
@@ -18,7 +17,7 @@ import type {DocumentType} from '../agent/document.service';
 import {whitelistedDomains} from '../../config/websearch.config';
 import {prompt as useSearchPrompt} from '../../prompts/tools/search.use';
 import {prompt as askSearchPrompt} from '../../prompts/tools/search.ask';
-import {prompt as pickResourcesPrompt} from '../../prompts/tools/search.pick';
+
 import {completion} from '../common/llm.service';
 import {stateManager} from '../agent/state.service';
 import {createTextService} from '../common/text.service';
@@ -107,15 +106,10 @@ const webService = {
    * console.log(`Scraped ${doc.text.length} characters from the webpage`);
    * ```
    */
-  getContents: async (url: string, conversation_uuid: string, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  getContents: async (url: string, conversation_uuid: string): Promise<DocumentType> => {
     try {
       const firecrawl = webService.createClient();
       const tokenizer = await createTokenizer();
-
-      span?.event({
-        name: 'web_scrape_attempt',
-        input: {url}
-      });
 
       const scrape_result = await firecrawl.scrapeUrl(url, {formats: ['markdown']}) as ScrapeResult;
 
@@ -147,15 +141,6 @@ const webService = {
 
       const tokens = tokenizer.countTokens(content);
 
-      span?.event({
-        name: 'web_scrape_success',
-        input: {url},
-        output: {
-          content_length: content.length,
-          tokens
-        }
-      });
-
       return documentService.createDocument({
         conversation_uuid,
         source_uuid: conversation_uuid,
@@ -177,13 +162,6 @@ const webService = {
       const tokenizer = await createTokenizer();
       const error_text = `Failed to fetch content: ${error instanceof Error ? error.message : 'Unknown error'}`;
       const tokens = tokenizer.countTokens(error_text);
-
-      span?.event({
-        name: 'web_scrape_error',
-        input: {url},
-        output: {error: error instanceof Error ? error.message : 'Unknown error'},
-        level: 'ERROR'
-      });
 
       return documentService.createDocument({
         conversation_uuid,
@@ -227,17 +205,12 @@ const webService = {
    * });
    * ```
    */
-  async execute(action: string, payload: unknown, span?: LangfuseSpanClient): Promise<DocumentType> {
+  async execute(action: string, payload: unknown): Promise<DocumentType> {
     if (action === 'search') {
       const { query } = searchPayloadSchema.parse(payload);
       const state = stateManager.getState();
       const conversation_uuid = state.config.conversation_uuid ?? 'unknown';
       const text_service = await createTextService({model_name: env.DEFAULT_TEXT_MODEL || 'gemini-2.5-flash'});
-
-      span?.event({
-        name: 'web_search_start',
-        input: {query}
-      });
 
       // 1. Check if search is needed
       const searchNecessity = await completion.object<{shouldSearch: boolean, _thoughts: string}>({
@@ -252,11 +225,6 @@ const webService = {
       });
 
       if (!searchNecessity.shouldSearch) {
-        span?.event({
-          name: 'web_search_skipped',
-          input: {query},
-          output: {reason: searchNecessity._thoughts}
-        });
         return documentService.createDocument({
           conversation_uuid,
           source_uuid: conversation_uuid,
@@ -284,10 +252,6 @@ const webService = {
       });
 
       if (!queryGeneration.queries.length) {
-        span?.event({
-          name: 'web_search_no_queries',
-          input: {query}
-        });
         return documentService.createDocument({
           conversation_uuid,
           source_uuid: conversation_uuid,
@@ -362,12 +326,6 @@ const webService = {
         })
       );
 
-      span?.event({
-        name: 'web_search_complete',
-        input: {query},
-        output: {documents_count: documents.length}
-      });
-
       return documentService.createDocument({
         conversation_uuid,
         source_uuid: conversation_uuid,
@@ -384,15 +342,7 @@ const webService = {
 
     if (action === 'getContents') {
       const { url } = getContentsPayloadSchema.parse(payload);
-      span?.event({
-        name: 'web_tool',
-        input: {
-          action,
-          url
-        }
-      });
-
-      return webService.getContents(url, 'unknown', span);
+      return webService.getContents(url, 'unknown');
     }
 
     throw new ValidationError(`Unknown action: ${action}`);

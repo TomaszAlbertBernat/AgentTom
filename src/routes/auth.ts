@@ -2,9 +2,7 @@ import { Hono } from 'hono';
 import { google } from 'googleapis';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import { findByToken, findByUUID, getGoogleTokens, updateGoogleTokens } from '../services/common/user.service';
-import { randomBytes } from 'crypto';
-import { spotifyService } from '../services/tools/spotify.service';
+
 import { AppEnv } from '../types/hono';
 import { zValidator } from '@hono/zod-validator';
 import { db } from '../database';
@@ -13,35 +11,14 @@ import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { apiKeyService } from '../services/common/api-key.service';
-import { apiKeys } from '../schema/api-keys';
 
 
-// Session interfaces
-interface SessionData {
-  id: string;
-  user_email: string;
-  access_token: string;
-  refresh_token?: string;
-  created_at: Date;
-}
 
-const SessionSchema = z.object({
-  user_email: z.string().email(),
-  access_token: z.string(),
-  refresh_token: z.string().optional()
-});
 
-const SpotifyCallbackSchema = z.object({
-  code: z.string(),
-  state: z.string()
-});
 
-// In-memory session storage
-const sessions = new Map<string, SessionData>();
 
 // Constants
 const GOOGLE_REDIRECT_URI = `${process.env.APP_URL}/api/auth/google/callback`;
-const SPOTIFY_REDIRECT_URI = `${process.env.APP_URL}/api/auth/spotify/callback`;
 
 // Environment validation schema
 const envSchema = z.object({
@@ -52,92 +29,13 @@ const envSchema = z.object({
   APP_URL: z.string().url()
 });
 
-// OAuth2 client setup with error handling
-const createOAuth2Client = () => {
-  const env = envSchema.parse(process.env);
-  return new google.auth.OAuth2(
-    env.GOOGLE_CLIENT_ID,
-    env.GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI
-  );
-};
 
-// Initialize OAuth2 client
-const oauth2Client = createOAuth2Client();
 
-const sessionService = {
-  create: async (data: z.infer<typeof SessionSchema>) => {
-    const session: SessionData = {
-      id: uuidv4(),
-      ...data,
-      created_at: new Date()
-    };
-    sessions.set(session.id, session);
-    return session;
-  },
-  get: async (session_id: string) => sessions.get(session_id) || null
-};
 
-const googleService = {
-  getAuthUrl: () => {
-    const scopes = [
-      'openid',
-      'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/spreadsheets',
-      'https://www.googleapis.com/auth/drive.file'
-    ];
 
-    return oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      response_type: 'code',
-      scope: scopes,
-      prompt: 'consent',
-      state: uuidv4(),
-      redirect_uri: GOOGLE_REDIRECT_URI
-    });
-  },
 
-  handleCallback: async (code: string) => {
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
 
-    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
-    const user_info = await oauth2.userinfo.get();
 
-    return sessionService.create({
-      user_email: user_info.data.email!,
-      access_token: tokens.access_token!,
-      refresh_token: tokens.refresh_token ?? undefined
-    });
-  }
-};
-
-// Update the Google OAuth client setup to use user tokens
-const createGoogleClient = async (user_uuid: string) => {
-  const tokens = await getGoogleTokens(user_uuid);
-  if (!tokens?.access_token) {
-    throw new Error('Google authentication required');
-  }
-
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI
-  );
-
-  oauth2Client.setCredentials({
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
-    expiry_date: tokens.expires_at?.getTime()
-  });
-
-  return oauth2Client;
-};
-
-// Add this schema for request validation
-const AuthRequestSchema = z.object({
-  token: z.string().optional()
-});
 
 const auth = new Hono<AppEnv>();
 

@@ -3,9 +3,7 @@ import { text, integer, sqliteTable, index } from "drizzle-orm/sqlite-core";
 import { documents } from './document';
 import { categories } from './category';
 import { conversationMemories } from './conversationMemories';
-import { vectorService } from '../services/common/vector.service';
-import { embedding } from "../services/common/llm.service";
-import { v4 as uuidv4 } from 'uuid';
+
 
 export const memories = sqliteTable('memories', {
   id: integer('id').primaryKey({ autoIncrement: true }),

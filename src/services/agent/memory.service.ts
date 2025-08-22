@@ -18,7 +18,6 @@ import { completion } from '../common/llm.service';
 import { stateManager } from './state.service';
 import { memoryRecallPrompt } from '../../prompts/tools/memory.recall';
 import { memory_categories } from '../../config/memory.config';
-import { LangfuseSpanClient } from 'langfuse';
 import NodeCache from 'node-cache';
 import { createLogger } from '../common/logger.service';
 
@@ -593,7 +592,7 @@ export const memoryService = {
     return memory;
   },
 
-  async getRecentMemoriesContext(span?: LangfuseSpanClient): Promise<DocumentType> {
+  async getRecentMemoriesContext(): Promise<DocumentType> {
     const state = stateManager.getState();
     const today = new Date();
 

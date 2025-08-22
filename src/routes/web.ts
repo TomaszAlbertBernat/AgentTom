@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { AppEnv } from '../types/hono';
 import { webService } from '../services/tools/web.service';
 import { validateBody } from '../middleware/validation';
-import { WebSchemas, CommonSchemas } from '../validation/schemas';
+import { CommonSchemas } from '../validation/schemas';
 import { z } from 'zod';
 import { getServiceStatus } from '../config/env.config';
 

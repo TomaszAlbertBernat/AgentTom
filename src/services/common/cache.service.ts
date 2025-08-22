@@ -104,7 +104,7 @@ export const cacheService = {
    * @returns {string} Serialized data string
    * @private
    */
-  _serialize(data: any, compress: boolean = false): string {
+  _serialize(data: any, _compress: boolean = false): string {
     try {
       const serialized = JSON.stringify(data);
       // TODO: Implement compression if needed
@@ -122,7 +122,7 @@ export const cacheService = {
    * @returns {any} Deserialized data
    * @private
    */
-  _deserialize(data: string, compress: boolean = false): any {
+  _deserialize(data: string, _compress: boolean = false): any {
     try {
       // TODO: Implement decompression if needed
       return JSON.parse(data);

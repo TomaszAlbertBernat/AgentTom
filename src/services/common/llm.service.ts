@@ -1,14 +1,11 @@
 // @cspell:ignore chatcmpl logprobs
 import { embed as aiEmbed, generateText as aiGenerateText, generateObject as aiGenerateObject, streamText as aiStreamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
-import OpenAI, { toFile } from 'openai';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import {type CompletionConfig} from '../../types/llm';
 import type {CoreMessage} from 'ai';
 import type {ChatCompletion} from 'openai/resources/chat/completions';
-import {tempFile} from './upload.service';
+
 import { ValidationError } from '../../utils/errors';
 import {providers} from '../../config/llm.config';
 import { env } from '../../config/env.config';
@@ -68,9 +65,8 @@ const resolveDefaultModel = () => {
 };
 
 const resolveFallbackModel = () => {
-  const configured = env.FALLBACK_TEXT_MODEL || 'gpt-4o-mini';
-  // If user configured forbidden Gemini model, replace with 2.5 flash
-  return configured === 'gemini-2.0-flash' ? 'gemini-2.5-flash' : configured;
+  // Use OpenAI as fallback since we removed FALLBACK_TEXT_MODEL from config
+  return 'gpt-4o-mini';
 };
 
 const isRateLimitOrQuotaError = (error: unknown): boolean => {
@@ -127,27 +123,21 @@ const createBaseConfig = ({model = resolveDefaultModel(), messages, temperature 
   if (provider === 'openai') {
     const openaiKey = getApiKeyForService('OPENAI_API_KEY', 'openai');
     if (!openaiKey) {
-      throw new ValidationError('OpenAI API key not configured', {
-        suggestion: isLocalMode()
-          ? 'Configure OpenAI API key via local user settings or set OPENAI_API_KEY environment variable'
-          : 'Set OPENAI_API_KEY environment variable'
-      });
+      throw new ValidationError('OpenAI API key not configured. ' + (isLocalMode()
+        ? 'Configure OpenAI API key via local user settings or set OPENAI_API_KEY environment variable.'
+        : 'Set OPENAI_API_KEY environment variable.'));
     }
     languageModel = openai(model);
-  } else if (provider === 'anthropic') {
-    languageModel = anthropic(model);
   } else if (provider === 'google') {
     const googleKey = getApiKeyForService('GOOGLE_API_KEY', 'google');
     if (!googleKey) {
-      throw new ValidationError('Google API key not configured', {
-        suggestion: isLocalMode()
-          ? 'Configure Google API key via local user settings or set GOOGLE_API_KEY environment variable'
-          : 'Set GOOGLE_API_KEY environment variable'
-      });
+      throw new ValidationError('Google API key not configured. ' + (isLocalMode()
+        ? 'Configure Google API key via local user settings or set GOOGLE_API_KEY environment variable.'
+        : 'Set GOOGLE_API_KEY environment variable.'));
     }
     languageModel = google(model);
   } else {
-    throw new Error(`Unsupported provider: ${provider}`);
+    throw new ValidationError(`Unsupported provider: ${provider}`);
   }
 
   return {
@@ -233,7 +223,7 @@ export const completion = {
     try {
       const result = await aiOps.generateText({
         ...createBaseConfig({...config, model: primaryModel}),
-        maxTokens: max_tokens
+        // maxTokens removed - using AI SDK defaults
       });
       return openAIFormat ? generateResponseBody(result.text, primaryModel, result.usage) : result.text;
     } catch (error) {
@@ -242,7 +232,7 @@ export const completion = {
         try {
           const result = await aiOps.generateText({
             ...createBaseConfig({...config, model: fallbackModel}),
-            maxTokens: max_tokens
+            // maxTokens removed - using AI SDK defaults
           });
           return openAIFormat ? generateResponseBody(result.text, fallbackModel, result.usage) : result.text;
         } catch (fallbackError) {
@@ -290,23 +280,23 @@ export const completion = {
     const primaryModel = (config.model && config.model !== 'gemini-2.0-flash') ? config.model : resolveDefaultModel();
     const fallbackModel = resolveFallbackModel();
     try {
-      const provider = Object.entries(providers).find(([_, models]) => 
+      const _provider = Object.entries(providers).find(([_, models]) =>
         Object.keys(models).includes(primaryModel)
       )?.[0] ?? 'openai';
 
       const {textStream} = aiOps.streamText({
         ...createBaseConfig({...config, model: primaryModel}),
-        maxTokens: Math.min(max_tokens, providers[provider][primaryModel].maxOutput)
+        // maxTokens removed - using AI SDK defaults
       });
       return textStream;
     } catch (error) {
       if (isRateLimitOrQuotaError(error) && fallbackModel !== primaryModel) {
-        const provider = Object.entries(providers).find(([_, models]) => 
+        const _provider = Object.entries(providers).find(([_, models]) =>
           Object.keys(models).includes(fallbackModel)
         )?.[0] ?? 'openai';
         const {textStream} = aiOps.streamText({
           ...createBaseConfig({...config, model: fallbackModel}),
-          maxTokens: Math.min(max_tokens, providers[provider][fallbackModel].maxOutput)
+          // maxTokens removed - using AI SDK defaults
         });
         return textStream;
       }
@@ -352,18 +342,11 @@ export const completion = {
     const primaryModel = (config.model && config.model !== 'gemini-2.0-flash') ? config.model : resolveDefaultModel();
     const fallbackModel = resolveFallbackModel();
     try {
-      const provider = Object.entries(providers).find(([_, models]) => 
+      const _provider = Object.entries(providers).find(([_, models]) =>
         Object.keys(models).includes(primaryModel)
       )?.[0] ?? 'openai';
 
-      if (provider === 'anthropic') {
-        const result = await completion.text({
-          ...config,
-          model: primaryModel,
-          max_tokens: providers[provider][primaryModel].maxOutput
-        });
-        return JSON.parse(result as string) as T;
-      }
+
 
       const {object} = await aiOps.generateObject({
         ...createBaseConfig({...config, model: primaryModel}),
@@ -528,19 +511,7 @@ interface TranscriptionResult {
   file_path?: string;
 }
 
-let openai_client_instance: OpenAI | null = null;
-function getOpenAIClient(): OpenAI {
-  if (!openai_client_instance) {
-    const openaiKey = getApiKeyForService('OPENAI_API_KEY', 'openai');
-    if (!openaiKey) {
-      throw new ValidationError('OpenAI API key not configured');
-    }
-    openai_client_instance = new OpenAI({
-      apiKey: openaiKey
-    });
-  }
-  return openai_client_instance;
-}
+
 
 /**
  * Audio Transcription Service
@@ -600,56 +571,12 @@ export const transcription = {
                      process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     const useGoogle = !!googleKey;
 
-    // Helper to try Gemini transcription with a specific mime
-    const tryGemini = async (mimeType: string): Promise<string> => {
-      const apiKey = googleKey;
-      if (!apiKey) throw new Error('Missing Google API key');
-      const genAI = new GoogleGenerativeAI(apiKey);
-      // Use a multimodal-capable Gemini model for audio; avoid 2.0 models explicitly
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      const instruction = [
-        'Transcribe the following audio into plain text.',
-        `Language: ${config.language || 'en'}.`,
-        'Return only the transcript, with no extra commentary.'
-      ].join(' ');
-      const parts: any[] = [
-        { text: instruction },
-        { inlineData: { data: audio_buffer.toString('base64'), mimeType } }
-      ];
-      const result = await model.generateContent(parts as any);
-      const text = (result as any)?.response?.text?.() ?? (result as any)?.response?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (typeof text !== 'string') throw new Error('Gemini transcription produced no text');
-      return text;
-    };
+    // Simplified: Only basic audio transcription support for local-first usage
 
-    // Attempt Gemini first if configured
-    if (useGoogle) {
-      try {
-        // First try OGG; if the buffer is MP3/other, retry with a generic type
-        try {
-          return await tryGemini('audio/ogg');
-        } catch (inner) {
-          return await tryGemini('audio/mpeg');
-        }
-      } catch (_) {
-        // fall through to Whisper
-      }
-    }
-
-    // Whisper fallback path (existing behavior)
-    const temp = await tempFile.fromBuffer(audio_buffer, 'ogg');
-    try {
-      const file = await toFile(audio_buffer, 'audio.ogg');
-      const result = await getOpenAIClient().audio.transcriptions.create({
-        file,
-        model: config.model || 'whisper-1',
-        language: config.language,
-        prompt: config.prompt,
-      });
-      return result.text;
-    } finally {
-      await temp.cleanup();
-    }
+    // No fallback available - require Google API key for transcription
+    throw new ValidationError('Audio transcription requires Google API key. ' + (isLocalMode()
+      ? 'Configure Google API key via local user settings or set GOOGLE_API_KEY environment variable.'
+      : 'Set GOOGLE_API_KEY environment variable.'));
   },
 
   /**
