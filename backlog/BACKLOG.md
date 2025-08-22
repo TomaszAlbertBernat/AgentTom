@@ -4,6 +4,15 @@ Master task list for the AgentTom AI assistant project.
 
 ## 🎯 Current Priorities (P0)
 
+- [ ] LO-001: Default to local mode and remove multi-user prompts in UI — hide login/register in local mode and guide to setup when needed  
+  `#frontend #ux #auth` `@est:4h` `@ac:no auth prompts in local mode; home redirects to setup if needed; /api/local-user/* flows visible`
+
+- [ ] LO-002: First-run setup flow polish for local mode — streamline local-user wizard and defaults  
+  `#backend #frontend #ux` `@est:4h` `@ac:start server → open /api/local-user/config → set name, default model gemini-2.5-flash, and at least one API key`
+
+- [ ] LO-005: Validate "just works" happy path — run-through and checklist  
+  `#testing #docs` `@est:3h` `@ac:server starts in local mode; curl /health ok; add API key via /api/local-user/api-keys; chat and tools endpoints succeed; add quick checklist to GETTING_STARTED.md`
+
 - [ ] BE-066: Migration script for existing users — preserve data when switching to local mode  
   `#backend #migration #config` `@est:4h` `@depends:BE-063` `@ac:existing installations can switch to local mode without data loss`
 
@@ -13,9 +22,14 @@ Master task list for the AgentTom AI assistant project.
 - [ ] ARCH-001: Tech stack review and simplification — verify if current tech stack is a good fit and identify areas for simplification/removal/addition  
   `#backend #frontend #architecture #docs` `@est:1d` `@ac:documented analysis of current stack, recommendations for simplification, actionable plan for improvements`
 
-- [ ] FE-019: Unify page shells and loading/empty states  
-  `#frontend #ux` `@est:6h` `@ac:skeleton/empty patterns consistent`
+  
 ## 🚀 Ready to Start (P1)
+
+- [ ] LO-003: Clarify "no auth required" across docs and app chrome — emphasize local-first  
+  `#docs #frontend` `@est:2h` `@ac:docs and UI indicate local mode; health details show local mode; no multi-user setup references in local mode`
+
+- [ ] LO-004: Remove multi-user-only flows from default navigation in local mode — simplify menus  
+  `#frontend #ux` `@est:3h` `@ac:no login/register routes in nav; tools/files accessible without auth banners`
 
 - [ ] BE-050: Design local music player integration architecture — create interface for local media players (Windows Media Player, VLC, foobar2000, etc.)  
   `#backend #tools #audio` `@est:6h` `@ac:interface supports play/pause/next/prev/search operations across multiple players`
@@ -56,7 +70,7 @@ Master task list for the AgentTom AI assistant project.
   `#docs #tools` `@est:2h` `@depends:BE-054` `@ac:clear setup instructions for each supported player`
 
 ### Epic: Personal Local-Only Simplification
-*User Story: "As a single user running on localhost, I want AgentTom to just work without any authentication, so I can use it immediately with my own API keys."*
+*User Story: "As a single user running on localhost, I want AgentTom to just work without any authentication, so I can use it immediately with my own API keys stored in a .env file inside the project's root."*
 
 - [ ] LO-001: Default to local mode and remove multi-user prompts in UI — hide login/register in local mode and guide to setup when needed  
   `#frontend #ux #auth` `@est:4h` `@ac:no auth prompts in local mode; home redirects to setup if needed; /api/local-user/* flows visible`
