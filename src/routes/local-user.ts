@@ -47,12 +47,23 @@ const updateConfigSchema = z.object({
     language: z.string().optional(),
     timezone: z.string().optional(),
     model: z.string().optional(),
+    setupCompleted: z.boolean().optional(),
   }).optional(),
 });
 
 localUser.patch('/config', zValidator('json', updateConfigSchema), async (c) => {
   const updates = c.req.valid('json');
-  const updated = saveLocalUserConfig(updates);
+
+  // Merge updates with existing config to handle required fields
+  const currentConfig = loadLocalUserConfig();
+  const mergedUpdates = {
+    ...updates,
+    preferences: updates.preferences
+      ? { ...currentConfig.preferences, ...updates.preferences }
+      : currentConfig.preferences
+  };
+
+  const updated = saveLocalUserConfig(mergedUpdates);
 
   return c.json({
     id: updated.id,
@@ -77,11 +88,17 @@ const updatePreferencesSchema = z.object({
   language: z.string().optional(),
   timezone: z.string().optional(),
   model: z.string().optional(),
+  setupCompleted: z.boolean().optional(),
 });
 
 localUser.patch('/preferences', zValidator('json', updatePreferencesSchema), async (c) => {
   const preferences = c.req.valid('json');
-  const updated = updateUserPreferences(preferences);
+
+  // Merge with existing preferences to handle required fields
+  const currentPreferences = getUserPreferences();
+  const mergedPreferences = { ...currentPreferences, ...preferences };
+
+  const updated = updateUserPreferences(mergedPreferences);
   return c.json(updated.preferences);
 });
 
@@ -194,9 +211,9 @@ localUser.get('/service-status', async (c) => {
         spotify: !!process.env.SPOTIFY_CLIENT_ID && !!process.env.SPOTIFY_CLIENT_SECRET,
         linear: !!process.env.LINEAR_API_KEY,
         resend: !!process.env.RESEND_API_KEY,
-        map: !!process.env.GOOGLE_API_KEY,
+        map: !!process.env.GOOGLE_API_KEY, // Google Maps API uses Google API key
         web: !!process.env.FIRECRAWL_API_KEY,
-        calendar: !!process.env.GOOGLE_API_KEY,
+        calendar: !!process.env.CALENDAR_CLIENT_ID && !!process.env.CALENDAR_CLIENT_SECRET,
         youtube: true // Always available for transcript extraction
       }
     };

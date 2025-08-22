@@ -5,6 +5,7 @@ import { validateBody } from '../middleware/validation';
 import { CommonSchemas } from '../validation/schemas';
 import { z } from 'zod';
 import { getServiceStatus } from '../config/env.config';
+import { isLocalMode } from '../config/local-user.config';
 
 // Extend Hono context for validated data access
 declare module 'hono' {
@@ -87,10 +88,27 @@ const web = new Hono<AppEnv>()
       }, 500);
     }
   })
-  .get('/health', c => c.json({ status: 'ok' }))
+  .get('/health', c => {
+    const isLocal = isLocalMode();
+    return c.json({
+      status: 'ok',
+      mode: isLocal ? 'local' : 'multi-user',
+      message: isLocal ? 'Local mode: No authentication required' : 'Multi-user mode: Authentication required'
+    });
+  })
   .get('/health/details', c => {
     const status = getServiceStatus();
-    return c.json({ status: 'ok', ...status });
+    const isLocal = isLocalMode();
+    return c.json({
+      status: 'ok',
+      mode: isLocal ? 'local' : 'multi-user',
+      auth_mode: isLocal ? 'local' : 'multi-user', // For frontend compatibility
+      auth: {
+        required: !isLocal,
+        message: isLocal ? 'No authentication required - local mode' : 'Authentication required - multi-user mode'
+      },
+      ...status
+    });
   });
 
 export default web; 

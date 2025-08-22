@@ -33,8 +33,8 @@ const isServiceAvailable = {
     return !!process.env.FIRECRAWL_API_KEY;
   },
   calendar: () => {
-    // Calendar requires Google API key
-    return !!process.env.GOOGLE_API_KEY;
+    // Calendar requires specific OAuth credentials
+    return !!process.env.CALENDAR_CLIENT_ID && !!process.env.CALENDAR_CLIENT_SECRET;
   },
   youtube: () => {
     // YouTube transcripts do not require API key for basic functionality

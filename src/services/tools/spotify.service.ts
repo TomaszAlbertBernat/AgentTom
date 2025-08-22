@@ -9,13 +9,21 @@ import {documentService} from '../agent/document.service';
 import type {DocumentType} from '../agent/document.service';
 import {updateSpotifyTokens, getSpotifyTokens} from '../common/user.service';
 
-const envSchema = z.object({
-  SPOTIFY_CLIENT_ID: z.string(),
-  SPOTIFY_CLIENT_SECRET: z.string(),
-  SPOTIFY_ACCESS_TOKEN: z.string().optional(),
-  SPOTIFY_REFRESH_TOKEN: z.string().optional(),
-  SPOTIFY_TOKEN_EXPIRY: z.string().optional()
-});
+// Environment validation - only validate if service is available
+let isServiceConfigured = false;
+try {
+  const envSchema = z.object({
+    SPOTIFY_CLIENT_ID: z.string(),
+    SPOTIFY_CLIENT_SECRET: z.string(),
+    SPOTIFY_ACCESS_TOKEN: z.string().optional(),
+    SPOTIFY_REFRESH_TOKEN: z.string().optional(),
+    SPOTIFY_TOKEN_EXPIRY: z.string().optional()
+  });
+  envSchema.parse(process.env);
+  isServiceConfigured = true;
+} catch (error) {
+  // Service not configured - this is expected when Spotify is not available
+}
 
 interface ToolResponse {
   text: string;
@@ -24,6 +32,13 @@ interface ToolResponse {
 }
 
 const spotifyService = {
+  // Helper function to check if service is configured
+  ensureConfigured: (): void => {
+    if (!isServiceConfigured) {
+      throw new Error('Spotify not configured. Please set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in your environment variables.');
+    }
+  },
+
   createAccessToken: (access_token: string, refresh_token: string, expires_in: number): AccessToken => ({
     access_token,
     token_type: 'Bearer',
@@ -53,7 +68,8 @@ const spotifyService = {
   },
 
   exchangeCode: async (code: string, user_uuid: string): Promise<void> => {
-    const env = envSchema.parse(process.env);
+    const client_id = process.env.SPOTIFY_CLIENT_ID!;
+    const client_secret = process.env.SPOTIFY_CLIENT_SECRET!;
     const redirect_uri = `${process.env.APP_URL}/api/auth/spotify/callback`;
     
     const params = new URLSearchParams({
@@ -67,7 +83,7 @@ const spotifyService = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                Authorization: `Basic ${Buffer.from(`${env.SPOTIFY_CLIENT_ID}:${env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
+                Authorization: `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID!}:${process.env.SPOTIFY_CLIENT_SECRET!}`).toString('base64')}`
             },
             body: params
         });
@@ -107,10 +123,9 @@ const spotifyService = {
       );
     }
 
-    const env = envSchema.parse(process.env);
     const refreshed_tokens = await spotifyService.refreshAccessToken(
-      env.SPOTIFY_CLIENT_ID,
-      env.SPOTIFY_CLIENT_SECRET,
+      process.env.SPOTIFY_CLIENT_ID!,
+      process.env.SPOTIFY_CLIENT_SECRET!,
       tokens.refresh_token
     );
 
@@ -129,7 +144,6 @@ const spotifyService = {
   },
 
   createClient: async (user_uuid: string): Promise<SpotifyApi> => {
-    const env = envSchema.parse(process.env);
     const tokens = await getSpotifyTokens(user_uuid);
     
     if (!tokens?.access_token || !tokens?.refresh_token) {
@@ -138,7 +152,7 @@ const spotifyService = {
 
     const access_token = await spotifyService.getAccessToken(user_uuid);
 
-    return SpotifyApi.withAccessToken(env.SPOTIFY_CLIENT_ID, access_token);
+    return SpotifyApi.withAccessToken(process.env.SPOTIFY_CLIENT_ID!, access_token);
   },
 
   search: async (query: string, types: Array<'album' | 'artist' | 'playlist' | 'track'>, limit: number = 5): Promise<SimplifiedSearchResults> => {
@@ -441,6 +455,9 @@ const spotifyService = {
   },
 
   execute: async (action: string, payload: any) => {
+    // Ensure service is configured before proceeding
+    spotifyService.ensureConfigured();
+
     const state = stateManager.getState();
 
     if (action === 'play_music') {

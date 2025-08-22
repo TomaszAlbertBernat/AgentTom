@@ -122,6 +122,16 @@ OPENAI_API_KEY=sk-your_openai_key
 
 ## 🛠️ Optional Services
 
+**All external services are strictly optional** - AgentTom works perfectly without any of them! These services only add extra functionality when their specific API keys are provided:
+
+- **Project Management**: Linear integration for task management
+- **Music Control**: Spotify integration for music playback
+- **Web Scraping**: Firecrawl for enhanced web content extraction
+- **Location Services**: Google Maps for location-based features
+- **Email**: Resend for email notifications
+- **Text-to-Speech**: ElevenLabs for voice generation
+- **Monitoring**: Sentry for error tracking
+
 Add these environment variables to enable additional features:
 
 ```bash

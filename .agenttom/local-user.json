@@ -1,7 +1,6 @@
 {
   "id": "1cbcd399-9f33-40ad-a266-38a104b291bd",
-  "name": "Test User",
-  "email": "test@example.com",
+  "name": "Local User",
   "preferences": {
     "theme": "system",
     "language": "en",
@@ -10,9 +9,9 @@
     "setupCompleted": false
   },
   "apiKeys": {
-    "google": "Y4fYsTctC1+2yrKBsMhcHuhluh+uLx04wuVMIAhJ+fJ+EaJkNhtr4UehOKscSESauaj/RU9lBW8qS5M71FG4cDG5PrwUzZ6PlPlH",
-    "openai": "sAmIukGJJhJrjLVB57UGD0/AXOSTid2Tm0JRkVeTyikW1+6ltMjwn+KCredJHur2N/G4aXrXJE372/Xus3egzky0UwyYKpFaVEVJ9P8=",
-    "elevenlabs": "bcJV+aRqDGdF99/HLk7lBZkmCC0bfgiiRqzLjEcxa3VU+zE27wSZeSaDmoBGHW7C/y/PNELXAjDd7uNM5IGdlNQ+jo1qGuiN",
+    "google": "pVv/QWNRFfYii+JotgiIG+3O5IHS8u6WiDT5WMV3OEfmQbR9FiF5qqeWHH4WK+3Di3hKptB2ls/C7us4Zx5eWLKY3u+ovHCpiuMC+i/G0nnhwX8eWXQ=",
+    "openai": "iTq9072gikFMGvH0/bh2105/1KlXuwGz3dP57ihHZVT5PDq0jAUhUM9rg/lxw2RHGLZ+34cmZcvFY40wFXEEx7xPq4tb/ARL63peDBM=",
+    "elevenlabs": "hQYYKOUVbfje8iIF806c5FVwlq76Tqk9OUloTvfoX04WsdfWgI46345Tu7bChJNRIggJnRlrxH2qWfcFrrjmaCVBKo5CBM6n",
     "spotify": {
       "clientId": "spotify-client-id",
       "clientSecret": "spotify-client-secret"
@@ -20,18 +19,18 @@
   },
   "apiKeyMetadata": {
     "google": {
-      "createdAt": "2025-08-21T19:19:41.902Z",
-      "lastRotated": "2025-08-21T19:19:42.465Z"
+      "createdAt": "2025-08-22T11:43:51.008Z",
+      "lastRotated": "2025-08-22T11:44:02.897Z"
     },
     "openai": {
       "createdAt": "2025-08-21T19:12:15.118Z",
-      "lastRotated": "2025-08-21T19:19:41.948Z"
+      "lastRotated": "2025-08-22T11:43:51.063Z"
     },
     "elevenlabs": {
       "createdAt": "2025-08-21T19:12:15.706Z",
-      "lastRotated": "2025-08-21T19:19:42.581Z"
+      "lastRotated": "2025-08-22T11:43:51.842Z"
     }
   },
   "createdAt": "2025-08-21T19:12:14.624Z",
-  "updatedAt": "2025-08-21T19:19:42.589Z"
+  "updatedAt": "2025-08-22T11:44:02.942Z"
 }
