@@ -55,6 +55,24 @@ Master task list for the AgentTom AI assistant project.
 - [ ] DOC-010: Document local music setup — installation and configuration guide  
   `#docs #tools` `@est:2h` `@depends:BE-054` `@ac:clear setup instructions for each supported player`
 
+### Epic: Personal Local-Only Simplification
+*User Story: "As a single user running on localhost, I want AgentTom to just work without any authentication, so I can use it immediately with my own API keys."*
+
+- [ ] LO-001: Default to local mode and remove multi-user prompts in UI — hide login/register in local mode and guide to setup when needed  
+  `#frontend #ux #auth` `@est:4h` `@ac:no auth prompts in local mode; home redirects to setup if needed; /api/local-user/* flows visible`
+
+- [ ] LO-002: First-run setup flow polish for local mode — streamline local-user wizard and defaults  
+  `#backend #frontend #ux` `@est:4h` `@ac:start server → open /api/local-user/config → set name, default model gemini-2.5-flash, and at least one API key`
+
+- [ ] LO-003: Clarify "no auth required" across docs and app chrome — emphasize local-first  
+  `#docs #frontend` `@est:2h` `@ac:docs and UI indicate local mode; health details show local mode; no multi-user setup references in local mode`
+
+- [ ] LO-004: Remove multi-user-only flows from default navigation in local mode — simplify menus  
+  `#frontend #ux` `@est:3h` `@ac:no login/register routes in nav; tools/files accessible without auth banners`
+
+- [ ] LO-005: Validate "just works" happy path — run-through and checklist  
+  `#testing #docs` `@est:3h` `@ac:server starts in local mode; curl /health ok; add API key via /api/local-user/api-keys; chat and tools endpoints succeed; add quick checklist to GETTING_STARTED.md`
+
 ## ✅ Completed
 
 - [x] BE-060: Design authentication-optional architecture — create user session without mandatory login  
