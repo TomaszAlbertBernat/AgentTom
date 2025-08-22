@@ -1,0 +1,118 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+
+    - name: Install dependencies
+      run: bun install
+
+    - name: Run database migrations
+      run: bun run migrate
+      env:
+        NODE_ENV: test
+
+    - name: Run test suite with CI reporting
+      run: bun run test:ci
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.node-version }}
+        path: |
+          test-results.xml
+          test-metrics.json
+          coverage/
+
+    - name: Publish test results to CI
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Test Results (${{ matrix.node-version }})
+        path: test-results.xml
+        reporter: java-junit
+        fail-on-error: true
+
+    - name: Generate test summary
+      if: always()
+      run: |
+        echo "## Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ -f test-metrics.json ]; then
+          # Extract and format metrics
+          METRICS=$(cat test-metrics.json)
+          TOTAL=$(echo $METRICS | jq -r '.total')
+          PASSED=$(echo $METRICS | jq -r '.passed')
+          FAILED=$(echo $METRICS | jq -r '.failed')
+          SKIPPED=$(echo $METRICS | jq -r '.skipped')
+          DURATION=$(echo $METRICS | jq -r '.duration')
+
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Tests | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| ✅ Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
+          echo "| ❌ Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏭️ Skipped | $SKIPPED |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏱️ Duration | $(($DURATION / 1000))s |" >> $GITHUB_STEP_SUMMARY
+
+          # Add coverage if available
+          if [ -f coverage/coverage.json ]; then
+            COVERAGE=$(cat coverage/coverage.json | jq -r '.total.lines.pct')
+            echo "| 📊 Coverage | ${COVERAGE}% |" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "❌ Test metrics not found" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Comment test results on PR
+      uses: actions/github-script@v7
+      if: always() && github.event_name == 'pull_request'
+      with:
+        script: |
+          const fs = require('fs');
+
+          let comment = '## 🧪 Test Results\n\n';
+
+          if (fs.existsSync('test-metrics.json')) {
+            const metrics = JSON.parse(fs.readFileSync('test-metrics.json', 'utf8'));
+
+            comment += `### Summary\n`;
+            comment += `- **Total Tests:** ${metrics.total}\n`;
+            comment += `- **✅ Passed:** ${metrics.passed}\n`;
+            comment += `- **❌ Failed:** ${metrics.failed}\n`;
+            comment += `- **⏭️ Skipped:** ${metrics.skipped}\n`;
+            comment += `- **⏱️ Duration:** ${(metrics.duration / 1000).toFixed(2)}s\n\n`;
+          }
+
+          if (fs.existsSync('test-results.xml')) {
+            comment += '### Test Report\n';
+            comment += '📄 Full test results are available in the CI artifacts.\n\n';
+          }
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });

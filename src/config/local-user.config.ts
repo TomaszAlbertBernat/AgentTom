@@ -274,25 +274,11 @@ function isEncryptedKey(key: string): boolean {
 }
 
 /**
- * Set API key for a specific service (with encryption)
+ * Set API key for a specific service (DISABLED - use .env file only)
+ * @deprecated Use environment variables in .env file instead
  */
 export const setApiKey = (service: keyof LocalUserConfig['apiKeys'], key: string): void => {
-  const config = loadLocalUserConfig();
-  
-  // Encrypt the API key
-  const encryptedKey = encryptSensitiveData(key, config.id);
-  config.apiKeys[service] = encryptedKey;
-  
-  // Update metadata
-  const now = new Date().toISOString();
-  if (!config.apiKeyMetadata[service]) {
-    config.apiKeyMetadata[service] = { createdAt: now };
-  } else {
-    config.apiKeyMetadata[service]!.lastRotated = now;
-  }
-  
-  config.updatedAt = new Date();
-  saveLocalUserConfig(config);
+  throw new Error(`API key management via web interface is disabled. Please configure ${service.toUpperCase()}_API_KEY in your .env file.`);
 };
 
 /**
@@ -345,14 +331,11 @@ export const getLocalUser = () => {
 };
 
 /**
- * Delete API key for a specific service
+ * Delete API key for a specific service (DISABLED - use .env file only)
+ * @deprecated Remove environment variables from .env file instead
  */
 export const deleteApiKey = (service: keyof LocalUserConfig['apiKeys']): void => {
-  const config = loadLocalUserConfig();
-  delete config.apiKeys[service];
-  delete config.apiKeyMetadata[service];
-  config.updatedAt = new Date();
-  saveLocalUserConfig(config);
+  throw new Error(`API key management via web interface is disabled. Please remove ${service.toUpperCase()}_API_KEY from your .env file.`);
 };
 
 /**
@@ -386,12 +369,46 @@ export const listApiKeys = () => {
 };
 
 /**
- * Test if an API key is valid by attempting to use it
+ * Test if an API key is valid by attempting to use it (reads from environment variables)
  */
 export const testApiKey = async (service: keyof LocalUserConfig['apiKeys']): Promise<{ valid: boolean; error?: string }> => {
-  const apiKey = getApiKey(service);
+  // Get API key directly from environment variables
+  let apiKey: string | undefined;
+
+  switch (service) {
+    case 'google':
+      apiKey = process.env.GOOGLE_API_KEY;
+      break;
+    case 'openai':
+      apiKey = process.env.OPENAI_API_KEY;
+      break;
+    case 'elevenlabs':
+      apiKey = process.env.ELEVENLABS_API_KEY;
+      break;
+    case 'resend':
+      apiKey = process.env.RESEND_API_KEY;
+      break;
+    case 'firecrawl':
+      apiKey = process.env.FIRECRAWL_API_KEY;
+      break;
+    case 'linear':
+      apiKey = process.env.LINEAR_API_KEY;
+      break;
+    case 'spotify':
+      // For Spotify, we need both client ID and secret
+      const clientId = process.env.SPOTIFY_CLIENT_ID;
+      const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+      if (clientId && clientSecret) {
+        return await testSpotifyApiKeys(clientId, clientSecret);
+      }
+      apiKey = undefined;
+      break;
+    default:
+      return { valid: false, error: `Service ${service} not supported for testing` };
+  }
+
   if (!apiKey) {
-    return { valid: false, error: 'No API key configured' };
+    return { valid: false, error: `No ${service.toUpperCase()}_API_KEY found in environment variables. Please set it in your .env file.` };
   }
 
   try {
@@ -405,9 +422,9 @@ export const testApiKey = async (service: keyof LocalUserConfig['apiKeys']): Pro
         return { valid: true }; // For services without test endpoints
     }
   } catch (error) {
-    return { 
-      valid: false, 
-      error: error instanceof Error ? error.message : 'Test failed' 
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : 'Test failed'
     };
   }
 };
@@ -438,6 +455,33 @@ async function testOpenAIApiKey(apiKey: string): Promise<{ valid: boolean; error
         'Authorization': `Bearer ${apiKey}`,
       },
     });
+    if (response.ok) {
+      return { valid: true };
+    } else {
+      return { valid: false, error: `HTTP ${response.status}: ${response.statusText}` };
+    }
+  } catch (error) {
+    return { valid: false, error: error instanceof Error ? error.message : 'Network error' };
+  }
+}
+
+/**
+ * Test Spotify API keys
+ */
+async function testSpotifyApiKeys(clientId: string, clientSecret: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    // Test Spotify API by getting an access token
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+      }),
+    });
+
     if (response.ok) {
       return { valid: true };
     } else {

@@ -39,6 +39,10 @@ const isServiceAvailable = {
   youtube: () => {
     // YouTube transcripts do not require API key for basic functionality
     return true;
+  },
+  localMusic: () => {
+    // Local music service requires explicit enablement
+    return process.env.LOCAL_MUSIC_ENABLED === 'true';
   }
 };
 
@@ -84,7 +88,8 @@ const externalToolsLoaders: Record<string, () => Promise<ToolService | null>> = 
   resend: createExternalServiceLoader('resend', () => import('../services/tools/resend.service')),
   map: createExternalServiceLoader('map', () => import('../services/tools/map.service')),
   web: createExternalServiceLoader('web', () => import('../services/tools/web.service')),
-  calendar: createExternalServiceLoader('calendar', () => import('../services/agent/calendar.service'))
+  calendar: createExternalServiceLoader('calendar', () => import('../services/agent/calendar.service')),
+  localMusic: createExternalServiceLoader('localMusic', () => import('../services/tools/local-music.service'))
 };
 
 // Build the final tools map dynamically

@@ -8,6 +8,34 @@ declare global {
   function afterEach(fn: () => void | Promise<void>): void;
 }
 
+// Test result and metrics types
+interface TestResult {
+  suite: string;
+  test: string;
+  status: 'pass' | 'fail' | 'skip';
+  duration: number;
+  error?: string;
+  coverage?: CoverageData;
+}
+
+interface CoverageData {
+  lines: { total: number; covered: number; percentage: number };
+  functions: { total: number; covered: number; percentage: number };
+  branches: { total: number; covered: number; percentage: number };
+  statements: { total: number; covered: number; percentage: number };
+}
+
+interface TestMetrics {
+  total: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  duration: number;
+  coverage?: CoverageData;
+  timestamp: Date;
+  environment: string;
+}
+
 // Mock environment variables for testing
 export const mockEnv = {
   NODE_ENV: 'test',
@@ -214,16 +242,168 @@ export const testHelpers = {
    * Asserts that a mock function was called with expected arguments
    */
   assertCalledWith: (mockLogs: any[], level: string, messagePattern: string | RegExp) => {
-    const found = mockLogs.some(log => 
-      log.level === level && 
-      (typeof messagePattern === 'string' 
+    const found = mockLogs.some(log =>
+      log.level === level &&
+      (typeof messagePattern === 'string'
         ? log.message.includes(messagePattern)
         : messagePattern.test(log.message)
       )
     );
-    
+
     if (!found) {
       throw new Error(`Expected ${level} log with pattern "${messagePattern}" not found`);
     }
   }
-}; 
+};
+
+/**
+ * Test reporting and metrics collection utilities
+ */
+export class TestReporter {
+  private results: TestResult[] = [];
+  private startTime: number = 0;
+  private endTime: number = 0;
+
+  /**
+   * Start test suite execution
+   */
+  startSuite() {
+    this.startTime = Date.now();
+    this.results = [];
+  }
+
+  /**
+   * End test suite execution and return metrics
+   */
+  endSuite(): TestMetrics {
+    this.endTime = Date.now();
+    const duration = this.endTime - this.startTime;
+
+    const metrics: TestMetrics = {
+      total: this.results.length,
+      passed: this.results.filter(r => r.status === 'pass').length,
+      failed: this.results.filter(r => r.status === 'fail').length,
+      skipped: this.results.filter(r => r.status === 'skip').length,
+      duration,
+      timestamp: new Date(),
+      environment: process.env.NODE_ENV || 'test'
+    };
+
+    return metrics;
+  }
+
+  /**
+   * Record a test result
+   */
+  recordResult(suite: string, test: string, status: 'pass' | 'fail' | 'skip', duration: number, error?: string) {
+    this.results.push({
+      suite,
+      test,
+      status,
+      duration,
+      error
+    });
+  }
+
+  /**
+   * Generate JUnit XML report for CI/CD integration
+   */
+  generateJUnitXML(): string {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="AgentTom Test Suite" time="${(this.endTime - this.startTime) / 1000}" timestamp="${new Date().toISOString()}">
+${this.generateTestSuites()}
+</testsuites>`;
+    return xml;
+  }
+
+  private generateTestSuites(): string {
+    const suites = new Map<string, TestResult[]>();
+
+    // Group results by suite
+    this.results.forEach(result => {
+      if (!suites.has(result.suite)) {
+        suites.set(result.suite, []);
+      }
+      suites.get(result.suite)!.push(result);
+    });
+
+    // Generate XML for each suite
+    let xml = '';
+    for (const [suiteName, suiteResults] of suites) {
+      const totalTests = suiteResults.length;
+      const failures = suiteResults.filter(r => r.status === 'fail').length;
+      const skipped = suiteResults.filter(r => r.status === 'skip').length;
+      const time = suiteResults.reduce((sum, r) => sum + r.duration, 0) / 1000;
+
+      xml += `  <testsuite name="${this.escapeXml(suiteName)}" tests="${totalTests}" failures="${failures}" skipped="${skipped}" time="${time}">
+${suiteResults.map(r => this.generateTestCase(r)).join('')}
+  </testsuite>
+`;
+    }
+
+    return xml;
+  }
+
+  private generateTestCase(result: TestResult): string {
+    const time = result.duration / 1000;
+    let xml = `    <testcase name="${this.escapeXml(result.test)}" time="${time}"`;
+
+    if (result.status === 'skip') {
+      xml += `>
+      <skipped />
+    </testcase>`;
+    } else if (result.status === 'fail' && result.error) {
+      xml += `>
+      <failure message="${this.escapeXml(result.error)}">
+        <![CDATA[${result.error}]]>
+      </failure>
+    </testcase>`;
+    } else {
+      xml += ` />`;
+    }
+
+    return xml;
+  }
+
+  private escapeXml(unsafe: string): string {
+    return unsafe
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
+   * Save JUnit XML report to file
+   */
+  async saveJUnitReport(filePath: string = 'test-results.xml') {
+    const xml = this.generateJUnitXML();
+    await Bun.write(filePath, xml);
+  }
+
+  /**
+   * Generate JSON metrics report for analysis
+   */
+  generateMetricsReport(): TestMetrics {
+    return this.endSuite();
+  }
+
+  /**
+   * Save metrics report as JSON
+   */
+  async saveMetricsReport(filePath: string = 'test-metrics.json') {
+    const metrics = this.generateMetricsReport();
+    await Bun.write(filePath, JSON.stringify(metrics, null, 2));
+  }
+
+  /**
+   * Get test results for analysis
+   */
+  getResults(): TestResult[] {
+    return [...this.results];
+  }
+}
+
+// Global test reporter instance
+export const testReporter = new TestReporter(); 

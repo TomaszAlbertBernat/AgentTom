@@ -77,6 +77,12 @@ site/
 # Testing
 .nyc_output/
 
+# Performance and metrics files
+performance-*.json
+test-results.xml
+*.metrics.json
+*-metrics.json
+
 # Misc
 .cursor/
 .cursorrules

@@ -68,9 +68,9 @@ export const setupService = {
       completedSteps.push('user_info');
     }
 
-    // Check API keys - completed if at least one AI provider key is present
-    const hasGoogleKey = !!getApiKey('google');
-    const hasOpenAIKey = !!getApiKey('openai');
+    // Check API keys - completed if at least one AI provider key is present in environment
+    const hasGoogleKey = !!process.env.GOOGLE_API_KEY;
+    const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
     const hasAnyAIKey = hasGoogleKey || hasOpenAIKey;
 
     if (hasAnyAIKey) {
@@ -91,16 +91,16 @@ export const setupService = {
 
     // Recommendations
     if (!hasGoogleKey && !hasOpenAIKey) {
-      recommendations.push('Add at least one AI provider API key (Google AI Studio or OpenAI)');
+      recommendations.push('Add at least one AI provider API key to your .env file (GOOGLE_API_KEY or OPENAI_API_KEY)');
     }
     if (!config.email) {
-      recommendations.push('Add email for better user experience');
+      recommendations.push('Add email for better user experience (optional)');
     }
     if (!hasGoogleKey && hasOpenAIKey) {
-      recommendations.push('Consider adding Google AI Studio key for primary AI service');
+      recommendations.push('Consider adding GOOGLE_API_KEY to your .env file for primary AI service');
     }
     if (config.name === 'Local User') {
-      recommendations.push('Set your name to personalize your experience');
+      recommendations.push('Set your name to personalize your experience (optional)');
     }
 
     const isComplete = requiredSteps.every(step => completedSteps.includes(step));
@@ -144,44 +144,11 @@ export const setupService = {
   },
 
   /**
-   * Setup API key for a service
+   * Setup API key for a service (DISABLED - use .env file only)
+   * @deprecated API keys must be configured in .env file
    */
   async setupApiKey(data: z.infer<typeof apiKeySetupSchema>) {
-    const validatedData = apiKeySetupSchema.parse(data);
-    const { service, key, testKey } = validatedData;
-
-    // Test the API key if requested
-    if (testKey) {
-      try {
-        const testResult = await testApiKey(service);
-        if (!testResult.valid) {
-          return {
-            success: false,
-            error: `API key test failed: ${testResult.error}`,
-            service,
-          };
-        }
-      } catch (error) {
-        // Store the key anyway, but warn about test failure
-        setApiKey(service, key);
-        return {
-          success: true,
-          warning: 'API key saved but test failed - please verify manually',
-          message: `${service} API key configured`,
-          service,
-        };
-      }
-    }
-
-    // Store the API key
-    setApiKey(service, key);
-
-    return {
-      success: true,
-      message: `${service} API key configured successfully`,
-      service,
-      tested: testKey,
-    };
+    throw new Error(`Web-based API key setup is disabled. Please configure ${data.service.toUpperCase()}_API_KEY in your .env file.`);
   },
 
   /**

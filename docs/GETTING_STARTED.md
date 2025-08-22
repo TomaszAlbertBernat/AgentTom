@@ -21,21 +21,11 @@ cd AgentTom
 bun install
 ```
 
-### 2. Environment Setup (Optional)
+### 2. Environment Setup (Required)
 
-For local mode, you can either:
-1. **Use the built-in configuration UI** (recommended)
-2. Set environment variables (optional)
+AgentTom requires a `.env` file with your API keys for local mode. No web-based configuration is supported.
 
-#### Option A: Built-in Configuration (Recommended)
-No `.env` file needed! Start the server and configure via the UI:
-
-```bash
-bun run dev
-# Open http://localhost:3000/api/local-user/config
-```
-
-#### Option B: Environment Variables (Optional)
+#### Setup .env file
 ```bash
 cp .env-example .env
 ```
@@ -43,20 +33,31 @@ cp .env-example .env
 Edit `.env` with your configuration:
 
 ```bash
-# Optional - At least one AI provider
+# Required - At least one AI provider API key
 GOOGLE_API_KEY=your_google_ai_studio_key
 # OR
 OPENAI_API_KEY=sk-your_openai_key
 
-# Optional - Basic config
+# Optional - Basic configuration
 APP_URL=http://localhost:3000
 PORT=3000
+LOG_LEVEL=INFO
 
-# Only needed for multi-user mode
-AUTH_MODE=multiuser  # Set to enable multi-user authentication
-JWT_SECRET=your-random-secret-here
-API_KEY=your-api-key-here
+# Optional - Additional services (only load when keys are provided)
+ELEVENLABS_API_KEY=your_elevenlabs_key
+RESEND_API_KEY=your_resend_key
+FIRECRAWL_API_KEY=your_firecrawl_key
+LINEAR_API_KEY=your_linear_key
+SPOTIFY_CLIENT_ID=your_spotify_client_id
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+
+# Multi-user mode (disabled by default)
+# AUTH_MODE=multiuser  # Uncomment to enable multi-user authentication
+# JWT_SECRET=your-random-secret-here
+# API_KEY=your-api-key-here
 ```
+
+**Important:** Only set environment variables that you actually need. AgentTom automatically detects and uses only the services with configured API keys.
 
 ### 3. Start the Server
 ```bash
@@ -73,51 +74,31 @@ curl http://localhost:3000/health
 
 ## 🔑 API Keys Setup
 
-### Local Mode Configuration (Recommended)
+### Local Mode Configuration
 
-Configure your API keys through the built-in interface:
-
-1. **Start the server** (no env setup needed):
-   ```bash
-   bun run dev
-   ```
-
-2. **Configure API keys via API**:
-   ```bash
-   # Add Google API key
-   curl -X POST http://localhost:3000/api/local-user/api-keys \
-     -H "Content-Type: application/json" \
-     -d '{"service":"google","key":"YOUR_GOOGLE_AI_STUDIO_KEY"}'
-
-   # Add OpenAI API key
-   curl -X POST http://localhost:3000/api/local-user/api-keys \
-     -H "Content-Type: application/json" \
-     -d '{"service":"openai","key":"YOUR_OPENAI_KEY"}'
-   ```
-
-3. **Check configured keys**:
-   ```bash
-   curl http://localhost:3000/api/local-user/api-keys
-   # Returns: {"google":true,"openai":true}
-   ```
+AgentTom reads API keys directly from your `.env` file. No web interface is available for configuration.
 
 ### Getting API Keys
 
 #### Google AI Studio (Recommended)
 1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
 2. Create API key
-3. Use the local configuration API above
+3. Add to your `.env` file: `GOOGLE_API_KEY=your_key_here`
 
 #### OpenAI (Fallback)
 1. Go to [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Create API key
-3. Use the local configuration API above
+3. Add to your `.env` file: `OPENAI_API_KEY=sk-your_key_here`
 
-### Environment Variables (Alternative)
-You can still use environment variables if preferred:
+### Testing API Keys
+
+After configuring your API keys in the `.env` file, test them:
 ```bash
-GOOGLE_API_KEY=your_google_ai_studio_key
-OPENAI_API_KEY=sk-your_openai_key
+# Test Google API key
+curl "http://localhost:3000/api/local-user/api-keys/google/test"
+
+# Test OpenAI API key
+curl "http://localhost:3000/api/local-user/api-keys/openai/test"
 ```
 
 ## 🛠️ Optional Services
@@ -171,7 +152,7 @@ Use this checklist to verify AgentTom "just works" in local mode:
 - [ ] **Server starts**: `bun run dev` runs without errors
 - [ ] **Health check**: `curl http://localhost:3000/api/health` returns `{"status":"ok"}`
 - [ ] **Local mode**: `curl http://localhost:3000/api/local-user/me` shows `isLocal: true`
-- [ ] **Setup auto-skip**: If `.env` has API keys, setup wizard is skipped automatically
+- [ ] **Auto-detection**: API keys are automatically detected from `.env` file on startup
 - [ ] **Chat works**: Frontend loads at `http://localhost:3000` and chat functionality works
 - [ ] **Tools accessible**: `/tools` page shows available tools without auth prompts
 
@@ -198,7 +179,7 @@ This shows which services are configured and your auth mode.
 curl http://localhost:3000/api/local-user/me
 
 # Check your configuration
-curl http://localhost:3000/api/local-user/config
+curl http://localhost:3000/api/local-user/me
 ```
 
 #### 3. Test API Access (No Authentication Required!)
@@ -296,7 +277,7 @@ bun run generate && bun run migrate
 ```
 
 **Missing API keys:**
-Check the startup logs or visit `http://localhost:3000/api/local-user/config` to see your configuration.
+Check the startup logs to see your configuration. API keys are read from your `.env` file.
 
 **Port already in use:**
 ```bash

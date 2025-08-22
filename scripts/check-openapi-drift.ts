@@ -175,7 +175,7 @@ class OpenAPIDriftChecker {
     }
   }
 
-  private printReport(): void> {
+  private printReport(): void {
     console.log('\n📊 OpenAPI Drift Check Report\n');
 
     if (this.results.issues.length > 0) {

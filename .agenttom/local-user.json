@@ -1,6 +1,7 @@
 {
   "id": "1cbcd399-9f33-40ad-a266-38a104b291bd",
-  "name": "Local User",
+  "name": "Test User",
+  "email": "test@example.com",
   "preferences": {
     "theme": "system",
     "language": "en",
@@ -32,5 +33,5 @@
     }
   },
   "createdAt": "2025-08-21T19:12:14.624Z",
-  "updatedAt": "2025-08-22T11:44:02.942Z"
+  "updatedAt": "2025-08-22T18:15:00.643Z"
 }

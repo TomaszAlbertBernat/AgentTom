@@ -108,80 +108,8 @@ localUser.get('/api-keys', async (c) => {
   return c.json(keys);
 });
 
-// Set API key for a service
-const setApiKeySchema = z.object({
-  service: z.enum(['google', 'openai', 'xai', 'elevenlabs', 'resend', 'firecrawl', 'linear']),
-  key: z.string().min(1),
-});
-
-localUser.post('/api-keys', zValidator('json', setApiKeySchema), async (c) => {
-  const { service, key } = c.req.valid('json');
-
-  try {
-    setApiKey(service, key);
-    return c.json({ success: true, service });
-  } catch (error) {
-    return c.json({ error: 'Failed to save API key' }, 500);
-  }
-});
-
-// Delete API key for a service
-localUser.delete('/api-keys/:service', async (c) => {
-  const service = c.req.param('service') as keyof ReturnType<typeof loadLocalUserConfig>['apiKeys'];
-
-  try {
-    deleteApiKey(service);
-    return c.json({ success: true, service });
-  } catch (error) {
-    return c.json({ error: 'Failed to delete API key' }, 500);
-  }
-});
-
-// Set Spotify API keys
-const setSpotifyKeysSchema = z.object({
-  clientId: z.string().min(1),
-  clientSecret: z.string().min(1),
-});
-
-localUser.post('/api-keys/spotify', zValidator('json', setSpotifyKeysSchema), async (c) => {
-  const { clientId, clientSecret } = c.req.valid('json');
-
-  try {
-    const config = loadLocalUserConfig();
-    config.apiKeys.spotify = { clientId, clientSecret };
-    saveLocalUserConfig(config);
-    return c.json({ success: true, service: 'spotify' });
-  } catch (error) {
-    return c.json({ error: 'Failed to save Spotify API keys' }, 500);
-  }
-});
-
-// Test API key for a service
-localUser.post('/api-keys/:service/test', async (c) => {
-  const service = c.req.param('service') as keyof ReturnType<typeof loadLocalUserConfig>['apiKeys'];
-
-  try {
-    const result = await testApiKey(service);
-    return c.json(result);
-  } catch (error) {
-    return c.json({ 
-      valid: false, 
-      error: error instanceof Error ? error.message : 'Test failed' 
-    }, 500);
-  }
-});
-
-// Get metadata for a specific API key
-localUser.get('/api-keys/:service/metadata', async (c) => {
-  const service = c.req.param('service') as keyof ReturnType<typeof loadLocalUserConfig>['apiKeys'];
-
-  try {
-    const metadata = getApiKeyMetadata(service);
-    return c.json(metadata);
-  } catch (error) {
-    return c.json({ error: 'Failed to get API key metadata' }, 500);
-  }
-});
+// API key management removed - use .env file only
+// All API keys must be configured through environment variables in .env file
 
 // Get current user info (for compatibility with existing auth routes)
 localUser.get('/me', async (c) => {

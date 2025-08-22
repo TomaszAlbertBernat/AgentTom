@@ -49,8 +49,8 @@ export const validateEnv = (): EnvConfig => {
       }
 
       console.error('\n💡 For local-first usage, only GOOGLE_API_KEY is required.');
-      console.error('📋 You can configure API keys via the setup wizard at /setup');
-      console.error('📄 Or copy the .env.example template to .env and add your API keys');
+      console.error('📄 Please copy .env-example to .env and add your API keys');
+      console.error('📋 API keys are read directly from the .env file on startup');
 
       // In development and test modes, provide safe defaults for local-first usage
       const nodeEnv = process.env.NODE_ENV || 'development';
