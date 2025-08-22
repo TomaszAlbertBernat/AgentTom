@@ -1,6 +1,7 @@
 {
-  "id": "3512c39f-f3b2-47d9-8ef4-080260112924",
-  "name": "Local User",
+  "id": "1cbcd399-9f33-40ad-a266-38a104b291bd",
+  "name": "Test User",
+  "email": "test@example.com",
   "preferences": {
     "theme": "system",
     "language": "en",
@@ -9,14 +10,28 @@
     "setupCompleted": false
   },
   "apiKeys": {
-    "google": "Lr+tlSpCQTaI/JWP11SzPoXB715RFmONWTaIZPCT7QSjovVwOxU0bmlso643r6XNq4Yw2Zdl7xlfybb9WRuAbaHZxuenCic6EjUetHr1lYEXSk3aj1c="
+    "google": "Y4fYsTctC1+2yrKBsMhcHuhluh+uLx04wuVMIAhJ+fJ+EaJkNhtr4UehOKscSESauaj/RU9lBW8qS5M71FG4cDG5PrwUzZ6PlPlH",
+    "openai": "sAmIukGJJhJrjLVB57UGD0/AXOSTid2Tm0JRkVeTyikW1+6ltMjwn+KCredJHur2N/G4aXrXJE372/Xus3egzky0UwyYKpFaVEVJ9P8=",
+    "elevenlabs": "bcJV+aRqDGdF99/HLk7lBZkmCC0bfgiiRqzLjEcxa3VU+zE27wSZeSaDmoBGHW7C/y/PNELXAjDd7uNM5IGdlNQ+jo1qGuiN",
+    "spotify": {
+      "clientId": "spotify-client-id",
+      "clientSecret": "spotify-client-secret"
+    }
   },
   "apiKeyMetadata": {
     "google": {
-      "createdAt": "2025-08-21T17:58:24.473Z",
-      "lastRotated": "2025-08-21T17:58:24.719Z"
+      "createdAt": "2025-08-21T19:19:41.902Z",
+      "lastRotated": "2025-08-21T19:19:42.465Z"
+    },
+    "openai": {
+      "createdAt": "2025-08-21T19:12:15.118Z",
+      "lastRotated": "2025-08-21T19:19:41.948Z"
+    },
+    "elevenlabs": {
+      "createdAt": "2025-08-21T19:12:15.706Z",
+      "lastRotated": "2025-08-21T19:19:42.581Z"
     }
   },
-  "createdAt": "2025-08-21T17:58:24.319Z",
-  "updatedAt": "2025-08-21T17:58:24.729Z"
+  "createdAt": "2025-08-21T19:12:14.624Z",
+  "updatedAt": "2025-08-21T19:19:42.589Z"
 }

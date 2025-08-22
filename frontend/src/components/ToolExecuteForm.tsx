@@ -1,64 +1,126 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useToast } from '@/lib/hooks/useToast';
+import { api } from '@/lib/api/client-wrapper';
+import { parseZodSchema, getToolActionSchemas, type ToolActionSchema } from '@/lib/schema-parser';
+import SchemaDrivenForm from './SchemaDrivenForm';
+import { toolSchemas } from '@/config/tool-schemas';
 
 type Props = {
   toolName: string;
   available?: boolean;
 };
 
+// Tools that should use schema-driven forms
+const SCHEMA_DRIVEN_TOOLS = ['web', 'memory', 'image'];
+
 export default function ToolExecuteForm({ toolName, available }: Props) {
+  const { showError, showSuccess } = useToast();
   const [action, setAction] = useState('');
   const [params, setParams] = useState('{}');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
   const [rateInfo, setRateInfo] = useState<{ remaining?: number; limit?: number; reset?: number } | null>(null);
 
+  // Check if this tool should use schema-driven forms
+  const useSchemaDriven = SCHEMA_DRIVEN_TOOLS.includes(toolName);
+
+  // Parse schemas for schema-driven tools
+  const toolActionSchemas = useMemo(() => {
+    if (!useSchemaDriven) return {};
+
+    const schemas = toolSchemas[toolName as keyof typeof toolSchemas];
+    if (!schemas) return {};
+
+    const result: Record<string, ToolActionSchema[]> = {};
+    for (const [actionName, schema] of Object.entries(schemas)) {
+      const fields = parseZodSchema(schema);
+      result[actionName] = [{
+        action: actionName,
+        fields
+      }];
+    }
+    return result;
+  }, [toolName, useSchemaDriven]);
+
   async function onExecute(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setResult(null);
+
     let parsed: any = {};
     try {
       parsed = params.trim() ? JSON.parse(params) : {};
     } catch (err) {
-      setError('Parameters must be valid JSON');
+      showError(err, {
+        description: 'Parameters must be valid JSON. Please check your syntax.',
+      });
       return;
     }
+
     setLoading(true);
+
     try {
-      const res = await fetch('/api/tools/execute', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ tool_name: toolName, action, parameters: parsed }),
+      const { data, error } = await api.POST('/api/tools/execute', {
+        body: { tool_name: toolName, action, parameters: parsed },
+        showToastOnError: false, // Handle error display manually
       });
-      const data = await res.json().catch(() => ({}));
-      const rl = {
-        remaining: Number(res.headers.get('x-ratelimit-remaining') || ''),
-        limit: Number(res.headers.get('x-ratelimit-limit') || ''),
-        reset: Number(res.headers.get('x-ratelimit-reset') || ''),
-      };
-      if (!Number.isNaN(rl.remaining) || !Number.isNaN(rl.limit) || !Number.isNaN(rl.reset)) {
-        setRateInfo(rl);
-        window.dispatchEvent(
-          new CustomEvent('rate-limit', {
-            detail: rl,
-          })
-        );
+
+      // Handle rate limiting info if available in response
+      // Note: This would need to be extracted from the response headers
+      // For now, we'll let the API wrapper handle the error normalization
+
+      if (error) {
+        showError(error, {
+          description: `Failed to execute ${toolName} tool`,
+          action: {
+            label: 'Retry',
+            onClick: () => onExecute(e),
+          },
+        });
+        return;
       }
-      if (!res.ok || data?.success === false) {
-        setError(data?.error || 'Execution failed');
-      } else {
+
+      if (data) {
         setResult(data?.result ?? data);
+        showSuccess(`${toolName} executed successfully!`, {
+          description: 'Tool completed without errors',
+        });
       }
     } catch (err) {
-      setError('Network error');
+      showError(err, {
+        description: 'Network error occurred during tool execution',
+      });
     } finally {
       setLoading(false);
     }
   }
 
+  // Render schema-driven forms for selected tools
+  if (useSchemaDriven && toolActionSchemas) {
+    return (
+      <div className="space-y-4">
+        {Object.entries(toolActionSchemas).map(([actionName, schemas]) => (
+          <SchemaDrivenForm
+            key={actionName}
+            toolName={toolName}
+            actionSchema={schemas[0]}
+            onSuccess={(result) => setResult(result?.result ?? result)}
+          />
+        ))}
+        {result != null && (
+          <div className="border rounded p-4">
+            <h4 className="font-semibold mb-2">Result</h4>
+            <pre className="text-xs bg-black/5 p-2 rounded overflow-auto max-h-80 whitespace-pre-wrap">
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Render traditional form for other tools
   return (
     <form onSubmit={onExecute} className="space-y-3">
       <div>
@@ -82,21 +144,6 @@ export default function ToolExecuteForm({ toolName, available }: Props) {
           placeholder="{}"
         />
       </div>
-      {error && (
-        <div className="text-sm text-red-600 flex items-center justify-between">
-          <span>{error}</span>
-          <button
-            type="button"
-            className="text-xs underline"
-            onClick={() => {
-              setError(null);
-              void onExecute(new Event('submit') as any);
-            }}
-          >
-            Retry
-          </button>
-        </div>
-      )}
       <button
         className="bg-black text-white px-4 py-2 rounded disabled:opacity-50"
         disabled={loading || !available}

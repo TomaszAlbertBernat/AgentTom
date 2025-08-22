@@ -1,9 +1,9 @@
 import { describe, test, expect, mock, beforeEach } from 'bun:test';
 
 // Mocks for observer and AGI service
-const endGeneration = mock.fn(async (_id: string, _output: any) => {});
-const finalizeTrace = mock.fn(async (_traceId: string, _messages: any[], _completions: any[]) => {});
-const setAssistantResponse = mock.fn(async (_: any) => {});
+const endGeneration = mock(() => Promise.resolve());
+const finalizeTrace = mock(() => Promise.resolve());
+const setAssistantResponse = mock(() => Promise.resolve());
 
 // Mock modules BEFORE importing the module under test
 mock.module('../../../src/services/agent/observer.service', () => ({
@@ -32,9 +32,9 @@ function readableFromChunks(chunks: string[], delayMs = 0): ReadableStream<strin
 
 describe('streamResponse monitoring hooks', () => {
   beforeEach(() => {
-    endGeneration.mock.reset();
-    finalizeTrace.mock.reset();
-    setAssistantResponse.mock.reset();
+    endGeneration.mockClear();
+    finalizeTrace.mockClear();
+    setAssistantResponse.mockClear();
   });
 
   test('calls endGeneration and finalizeTrace on flush', async () => {
@@ -66,16 +66,16 @@ describe('streamResponse monitoring hooks', () => {
     expect(received.includes('data: ')).toBeTrue();
 
     // Monitoring hooks should have been called once
-    expect(endGeneration.mock.calls.length).toBe(1);
-    expect(finalizeTrace.mock.calls.length).toBe(1);
+    expect(endGeneration).toHaveBeenCalledTimes(1);
+    expect(finalizeTrace).toHaveBeenCalledTimes(1);
 
     // Validate arguments
-    expect(endGeneration.mock.calls[0][0]).toBe('gen-abc');
-    expect(finalizeTrace.mock.calls[0][0]).toBe('trace-xyz');
+    expect(endGeneration).toHaveBeenCalledWith('gen-abc', expect.any(Object));
+    expect(finalizeTrace).toHaveBeenCalledWith('trace-xyz', expect.any(Array), expect.any(Array));
 
     // Assistant response should be recorded via mocked AGI service
-    expect(setAssistantResponse.mock.calls.length).toBe(1);
-    expect(setAssistantResponse.mock.calls[0][0].conversation_id).toBe('conv-1');
+    expect(setAssistantResponse).toHaveBeenCalledTimes(1);
+    expect(setAssistantResponse).toHaveBeenCalledWith(expect.objectContaining({ conversation_id: 'conv-1' }));
   });
 });
 

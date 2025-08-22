@@ -1,25 +1,33 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api/client-wrapper';
+import type { paths } from '@/lib/api/types';
 
-export type ToolRecord = {
-  id?: string;
-  name?: string;
-  description?: string;
-  available?: boolean;
-  enabled?: boolean;
-};
+type ToolsResponse = paths['/api/tools']['get']['responses']['200']['content']['application/json'];
+export type ToolRecord = ToolsResponse['tools'][number];
 
 async function fetchTools(): Promise<ToolRecord[]> {
-  const res = await fetch('/api/tools', { cache: 'no-store' });
-  if (!res.ok) throw new Error('Failed to load tools');
-  const data = await res.json().catch(() => ({}));
-  const tools = Array.isArray(data?.tools) ? data.tools : Array.isArray(data) ? data : [];
-  return tools as ToolRecord[];
+  const { data, error } = await api.GET('/api/tools', {
+    showToastOnError: false, // Let React Query handle the error display
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to load tools');
+  }
+
+  return data?.tools || [];
 }
 
 export function useToolsQuery() {
-  return useQuery({ queryKey: ['tools'], queryFn: fetchTools, staleTime: 30_000 });
+  return useQuery({
+    queryKey: ['tools'],
+    queryFn: fetchTools,
+    staleTime: 30_000,
+    meta: {
+      errorMessage: 'Failed to load tools',
+    },
+  });
 }
 
 

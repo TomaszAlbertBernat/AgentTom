@@ -1,45 +1,60 @@
 'use client';
 import { useState } from 'react';
+import { useToast } from '@/lib/hooks/useToast';
+import { api } from '@/lib/api/client-wrapper';
 
 export default function FilesPage() {
+  const { showError, showSuccess } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [useBase64, setUseBase64] = useState(false);
 
   async function upload() {
     if (!file) return;
     setLoading(true);
-    setError(null);
-    const form = new FormData();
-    form.append('file', file);
-    const res = await fetch('/api/files/upload', {
-      method: 'POST',
-      body: form,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data?.success === false) {
-      setError(data?.error || 'Upload failed');
+    setResult(null);
+
+    try {
+      const form = new FormData();
+      form.append('file', file);
+
+      const { data, error } = await api.POST('/api/files/upload', {
+        body: form,
+        showToastOnError: false, // Handle error display manually
+      });
+
+      if (error) {
+        showError(error, {
+          description: 'Failed to upload file. Please check the file and try again.',
+          action: {
+            label: 'Retry',
+            onClick: () => upload(),
+          },
+        });
+        return;
+      }
+
+      if (data) {
+        setResult(data?.data ?? data);
+        showSuccess('File uploaded successfully!', {
+          description: `File "${file.name}" has been uploaded and processed`,
+        });
+      }
+    } catch (err) {
+      showError(err, {
+        description: 'Network error occurred during file upload',
+      });
+    } finally {
+      setLoading(false);
     }
-    setResult(data?.data ?? data);
-    const rlRemaining = Number(res.headers.get('x-ratelimit-remaining') || '');
-    const rlLimit = Number(res.headers.get('x-ratelimit-limit') || '');
-    const rlReset = Number(res.headers.get('x-ratelimit-reset') || '');
-    if (!Number.isNaN(rlRemaining) || !Number.isNaN(rlLimit) || !Number.isNaN(rlReset)) {
-      window.dispatchEvent(
-        new CustomEvent('rate-limit', {
-          detail: { remaining: rlRemaining, limit: rlLimit, reset: rlReset },
-        })
-      );
-    }
-    setLoading(false);
   }
 
   async function uploadBase64() {
     if (!file) return;
     setLoading(true);
-    setError(null);
+    setResult(null);
+
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -57,28 +72,33 @@ export default function FilesPage() {
         type: 'document',
         original_name: file.name,
       };
-      const res = await fetch('/api/files/upload/base64', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
+
+      const { data, error } = await api.POST('/api/files/upload/base64', {
+        body: payload,
+        showToastOnError: false, // Handle error display manually
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) {
-        setError(data?.error || 'Upload failed');
+
+      if (error) {
+        showError(error, {
+          description: 'Failed to upload file as base64. Please try again.',
+          action: {
+            label: 'Retry',
+            onClick: () => uploadBase64(),
+          },
+        });
+        return;
       }
-      setResult(data?.data ?? data);
-      const rlRemaining = Number(res.headers.get('x-ratelimit-remaining') || '');
-      const rlLimit = Number(res.headers.get('x-ratelimit-limit') || '');
-      const rlReset = Number(res.headers.get('x-ratelimit-reset') || '');
-      if (!Number.isNaN(rlRemaining) || !Number.isNaN(rlLimit) || !Number.isNaN(rlReset)) {
-        window.dispatchEvent(
-          new CustomEvent('rate-limit', {
-            detail: { remaining: rlRemaining, limit: rlLimit, reset: rlReset },
-          })
-        );
+
+      if (data) {
+        setResult(data?.data ?? data);
+        showSuccess('File uploaded successfully!', {
+          description: `File "${file.name}" has been uploaded and processed as base64`,
+        });
       }
     } catch (err) {
-      setError('Failed to read file');
+      showError(err, {
+        description: 'Failed to read file. Please check the file and try again.',
+      });
     } finally {
       setLoading(false);
     }
@@ -102,7 +122,6 @@ export default function FilesPage() {
           </button>
         )}
       </div>
-      {error && <div className="text-sm text-red-600">{error}</div>}
       {result && (
         <div className="space-y-2">
           <pre className="text-xs bg-black/5 p-2 rounded overflow-auto max-h-64">{JSON.stringify(result, null, 2)}</pre>

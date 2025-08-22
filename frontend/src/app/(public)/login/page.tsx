@@ -1,40 +1,50 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/lib/hooks/useToast';
+import { api } from '@/lib/api/client-wrapper';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { showError, showSuccess } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setError(null);
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data?.message || 'Login failed');
-    } else {
-      router.replace('/');
+
+    try {
+      const { data, error } = await api.POST('/api/auth/login', {
+        body: { email, password },
+        showToastOnError: false, // Handle error display manually
+      });
+
+      if (error) {
+        showError(error, {
+          description: 'Please check your credentials and try again',
+        });
+        return;
+      }
+
+      if (data) {
+        showSuccess('Successfully logged in!', {
+          description: 'Welcome back!',
+        });
+        router.replace('/');
+      }
+    } catch (err) {
+      showError(err, {
+        description: 'An unexpected error occurred during login',
+      });
+    } finally {
+      setLoading(false);
     }
-    const rlRemaining = Number(res.headers.get('x-ratelimit-remaining') || '');
-    const rlLimit = Number(res.headers.get('x-ratelimit-limit') || '');
-    const rlReset = Number(res.headers.get('x-ratelimit-reset') || '');
-    if (!Number.isNaN(rlRemaining) || !Number.isNaN(rlLimit) || !Number.isNaN(rlReset)) {
-      window.dispatchEvent(
-        new CustomEvent('rate-limit', {
-          detail: { remaining: rlRemaining, limit: rlLimit, reset: rlReset },
-        })
-      );
-    }
-    setLoading(false);
+
+    // Handle rate limiting
+    // Note: This would need to be extracted from the response headers
+    // For now, we'll let the API wrapper handle the error normalization
   }
 
   return (
@@ -49,7 +59,6 @@ export default function LoginPage() {
           <label className="block text-sm mb-1">Password</label>
           <input className="w-full border rounded p-2" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
-        {error && <p className="text-red-600 text-sm">{error}</p>}
         <button disabled={loading} className="bg-black text-white px-4 py-2 rounded disabled:opacity-50" type="submit">
           {loading ? 'Signing in…' : 'Sign in'}
         </button>

@@ -113,10 +113,14 @@ export const loadLocalUserConfig = (): LocalUserConfig => {
     const parsed = JSON.parse(configData);
 
     // Parse with schema validation and update timestamps
-    const validated = localUserSchema.parse({
+    // Convert date strings back to Date objects if needed
+    const withDates = {
       ...parsed,
+      createdAt: parsed.createdAt ? new Date(parsed.createdAt) : new Date(),
       updatedAt: new Date(),
-    });
+    };
+
+    const validated = localUserSchema.parse(withDates);
 
     return validated;
   } catch (error) {
@@ -135,9 +139,15 @@ export const saveLocalUserConfig = (config: Partial<LocalUserConfig>): LocalUser
     const configPath = getConfigPath();
 
     // Load existing config or create default
-    const existing = fs.existsSync(configPath)
+    const existingRaw = fs.existsSync(configPath)
       ? JSON.parse(fs.readFileSync(configPath, 'utf-8'))
       : defaultConfig;
+
+    // Convert date strings back to Date objects if needed
+    const existing = {
+      ...existingRaw,
+      createdAt: existingRaw.createdAt ? new Date(existingRaw.createdAt) : new Date(),
+    };
 
     // Merge and validate
     const updated = localUserSchema.parse({
