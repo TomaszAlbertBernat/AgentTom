@@ -8,7 +8,7 @@ AgentTom is a TypeScript-based AI assistant that combines:
 - **Conversational AI** with Google Gemini (default) and OpenAI fallback
 - **Rich Tool Ecosystem** - Spotify, Linear, Maps, Calendar, Email, TTS, and more
 - **Modern Architecture** - Hono framework, Drizzle ORM, Zod validation
-- **Comprehensive Monitoring** - Langfuse observability, Sentry error tracking
+- **Comprehensive Monitoring** - Health endpoints and structured logs; Sentry ready
 
 ## 🚀 Quick Start
 
@@ -109,10 +109,9 @@ bun run dev
 
 ## 📊 Monitoring & Observability
 
-- **Langfuse** - AI interaction tracking and prompt monitoring
-- **Sentry** - Error tracking and performance monitoring  
-- **Structured Logging** - JSON formatted logs with levels
 - **Health Endpoints** - Service status and dependency checks
+- **Structured Logging** - JSON formatted logs with levels
+- **Sentry** - Error tracking and performance monitoring (optional)
 
 ## 🚀 Deployment
 

@@ -20,13 +20,13 @@
 ### ❌ **Failing/Missing Test Categories (21 failing tests)**
 
 #### **Dependencies Issues**
-- Missing AI SDK packages (`ai`, `langfuse`)
+- Missing AI SDK packages (`ai`)
 - Missing Zod package references
 - Missing Hono framework imports
 
 #### **Service Tests with Issues**
 - **LLM Service** (4 failing) - AI SDK integration tests
-- **Observer Service** (7 failing) - Langfuse integration tests
+- **Observer Service** (tests updated) - Langfuse integration removed
 - **Cache Service** - Environment configuration tests
 - **API Tools Dispatch** - Tool execution tests
 
@@ -72,7 +72,7 @@
 ```bash
 # Install missing packages
 bun add -D @types/node
-bun add ai langfuse zod hono
+bun add ai zod hono
 
 # Update test configurations
 ```

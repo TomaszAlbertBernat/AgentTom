@@ -220,7 +220,6 @@ const fileService = {
    * Loads content from various sources including URLs, files, and YouTube videos
    * @param path - Path or URL to the content to load
    * @param conversation_uuid - UUID of the current conversation
-   * @param span - Optional Langfuse span for tracing
    * @returns Promise that resolves to a document containing the loaded content
    * @throws Error if loading fails or unsupported content type
    * @example
@@ -308,7 +307,6 @@ const fileService = {
    * @param file_path - Path or name for the file being uploaded
    * @param content - Text content of the file
    * @param conversation_uuid - UUID of the current conversation
-   * @param span - Optional Langfuse span for tracing
    * @returns Promise that resolves to a document containing the uploaded content
    * @throws Error if upload fails or content processing fails
    * @example
@@ -358,7 +356,6 @@ const fileService = {
    * @param query - The query or prompt for content generation
    * @param context_uuids - Array of document UUIDs to use as context
    * @param conversation_uuid - UUID of the current conversation
-   * @param span - Optional Langfuse span for tracing
    * @returns Promise that resolves to a document containing the generated content
    * @throws Error if generation fails or context documents cannot be loaded
    * @example
@@ -467,7 +464,6 @@ const fileService = {
    * Main entry point for file service operations with validation and error handling
    * @param action - The action to perform ('write', 'load', or 'upload')
    * @param payload - Action-specific payload data
-   * @param span - Optional Langfuse span for tracing
    * @returns Promise that resolves to a document containing the operation result
    * @throws Error if action is invalid or operation fails
    * @example

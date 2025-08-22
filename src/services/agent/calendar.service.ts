@@ -153,7 +153,7 @@ const getAuthUrl = (auth: OAuth2Client): string => {
   });
 };
 
-const handleCallback = async (auth: OAuth2Client, code: string, span?: LangfuseSpanClient): Promise<CalendarTokens> => {
+const handleCallback = async (auth: OAuth2Client, code: string): Promise<CalendarTokens> => {
   try {
     const {tokens} = await auth.getToken(code);
     auth.setCredentials(tokens);
@@ -167,20 +167,9 @@ const handleCallback = async (auth: OAuth2Client, code: string, span?: LangfuseS
     
     await saveTokens(calendarTokens);
     
-    span?.event({
-      name: 'calendar_auth_success',
-      input: {code_length: code.length},
-      output: {has_refresh_token: !!tokens.refresh_token}
-    });
     
     return calendarTokens;
   } catch (error) {
-    span?.event({
-      name: 'calendar_auth_error',
-      input: {code_length: code.length},
-      output: {error: error instanceof Error ? error.message : 'Unknown error'},
-      level: 'ERROR'
-    });
     throw error;
   }
 };
@@ -188,7 +177,7 @@ const handleCallback = async (auth: OAuth2Client, code: string, span?: LangfuseS
 const createEvent = async (
   calendar: calendar_v3.Calendar,
   event_data: z.infer<typeof eventSchema>,
-  span?: LangfuseSpanClient
+  
 ): Promise<calendar_v3.Schema$Event> => {
   try {
     const validated_event = eventSchema.parse(event_data);
@@ -225,7 +214,7 @@ const createEvent = async (
 const searchEvents = async (
   calendar: calendar_v3.Calendar,
   search_params: z.infer<typeof eventSearchSchema>,
-  span?: LangfuseSpanClient
+  
 ): Promise<string> => {
   try {
     const validated_params = eventSearchSchema.parse(search_params);
@@ -258,20 +247,9 @@ const searchEvents = async (
 ${xml_events}
 </events>`;
 
-    span?.event({
-      name: 'calendar_events_searched',
-      input: validated_params,
-      output: { events_count: events.length }
-    });
 
     return xml_output;
   } catch (error) {
-    span?.event({
-      name: 'calendar_search_error',
-      input: search_params,
-      output: { error: error instanceof Error ? error.message : 'Unknown error' },
-      level: 'ERROR'
-    });
     throw error;
   }
 };
@@ -279,7 +257,7 @@ ${xml_events}
 const updateEvent = async (
   calendar: calendar_v3.Calendar,
   update_data: z.infer<typeof eventUpdateSchema>,
-  span?: LangfuseSpanClient
+  
 ): Promise<calendar_v3.Schema$Event> => {
   try {
     const validated_data = eventUpdateSchema.parse(update_data);
@@ -301,20 +279,9 @@ const updateEvent = async (
       },
     });
 
-    span?.event({
-      name: 'calendar_event_updated',
-      input: validated_data,
-      output: { event_id: response.data.id }
-    });
 
     return response.data;
   } catch (error) {
-    span?.event({
-      name: 'calendar_update_error',
-      input: update_data,
-      output: { error: error instanceof Error ? error.message : 'Unknown error' },
-      level: 'ERROR'
-    });
     throw error;
   }
 };
@@ -326,7 +293,7 @@ interface CalendarError extends Error {
 }
 
 const calendarService = {
-  execute: async (action: string, payload: unknown, span?: LangfuseSpanClient): Promise<DocumentType> => {
+  execute: async (action: string, payload: unknown): Promise<DocumentType> => {
     const state = stateManager.getState();
     const conversation_uuid = state.config.conversation_uuid ?? 'unknown';
 
@@ -468,16 +435,6 @@ const calendarService = {
           throw new ValidationError(`Unknown calendar action: ${action}`);
       }
     } catch (error) {
-      span?.event({
-        name: 'calendar_operation_error',
-        input: { action, payload_type: typeof payload },
-        output: { 
-          error: error instanceof Error ? error.message : 'Unknown error',
-          code: (error as CalendarError).code,
-          details: (error as CalendarError).details
-        },
-        level: 'ERROR'
-      });
 
       return documentService.createErrorDocument({
         error,
@@ -487,7 +444,7 @@ const calendarService = {
     }
   },
 
-  getRecentEventsContext: async (span?: LangfuseSpanClient): Promise<DocumentType> => {
+  getRecentEventsContext: async (): Promise<DocumentType> => {
     const today = new Date();
     const timeMin = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days ago
     const timeMax = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days ahead

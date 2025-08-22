@@ -41,8 +41,8 @@ This document analyzes the current AgentTom tech stack and provides recommendati
 - **Streaming** - Real-time response delivery
 
 ### Observability
-- **Langfuse** - AI conversation tracking and analytics
-- **Token counting** - Usage monitoring and cost tracking
+- **Health endpoints** - System and dependency status
+- **Structured logs** - Service/component loggers
 
 ## 🛠️ External Integrations
 
@@ -51,12 +51,12 @@ This document analyzes the current AgentTom tech stack and provides recommendati
 - **OpenAI** - Fallback LLM access
 
 ### Optional Services
-- **Linear** - Project management integration
-- **Spotify** - Music control and playback
-- **Google Maps** - Location and mapping services
-- **Resend** - Email delivery service
-- **ElevenLabs** - Text-to-speech conversion
-- **Firecrawl** - Web scraping and content extraction
+- **Linear** - Project management integration (requires LINEAR_API_KEY)
+- **Spotify** - Music control and playback (requires SPOTIFY_CLIENT_ID/SECRET)
+- **Google Maps** - Location and mapping services (requires GOOGLE_API_KEY)
+- **Resend** - Email delivery service (requires RESEND_API_KEY)
+- **ElevenLabs** - Text-to-speech conversion (requires ELEVENLABS_API_KEY)
+- **Firecrawl** - Web scraping and content extraction (requires FIRECRAWL_API_KEY)
 
 ### Data & Search
 - **Qdrant** - Vector database for embeddings
@@ -101,12 +101,12 @@ This document analyzes the current AgentTom tech stack and provides recommendati
 
 ### Monitoring
 - **Structured logging** - JSON/text log formats
-- **Error tracking** - Sentry integration ready
+- **Error tracking** - Sentry integration ready (optional)
 - **Performance metrics** - Response time tracking
 
 ### Security
 - **Input validation** - All requests validated with Zod
-- **Rate limiting** - Redis-backed request limiting
+- **Rate limiting** - Redis-backed request limiting (optional; no-op without Redis)
 - **CORS configuration** - Origin and header control
 - **File upload limits** - Size and type restrictions
 
@@ -150,9 +150,8 @@ This document analyzes the current AgentTom tech stack and provides recommendati
 ### Optional Dependencies
 ```json
 {
-  "ioredis": "Redis client (rate limiting)",
-  "langfuse": "AI observability",
-  "@sentry/node": "Error tracking"
+  "ioredis": "Redis client (rate limiting, optional)",
+  "@sentry/node": "Error tracking (optional)"
 }
 ```
 

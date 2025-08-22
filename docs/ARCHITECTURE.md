@@ -118,8 +118,7 @@ File Upload → MIME Validation → Storage → Database Record → File URL
 - **Performance tracking** for AI calls
 
 ### Error Tracking
-- **Langfuse** for AI observability
-- **Sentry** integration ready
+- **Sentry** integration ready (optional)
 - **Centralized error handling**
 
 ## 🚀 Deployment Architecture
@@ -197,8 +196,7 @@ File Upload → MIME Validation → Storage → Database Record → File URL
 
 ### Phase 3: Service Optimization
 - **Reduce AI providers** - Keep Google Gemini primary, optional OpenAI fallback
-- **Remove Langfuse** - Eliminate AI observability overhead
-- **Simplify external services** - Make most integrations optional
+- **Simplify external services** - Make integrations optional with clear detection
 - **Streamline database operations** - Reduce migration complexity
 
 ### Target Simplified Architecture

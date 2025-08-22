@@ -48,13 +48,5 @@ export const providers: Record<string, Record<string, ModelSpecs>> = {
       maxOutput: 8_192,
       knowledgeCutoff: '2024-07'
     }
-  },
-  anthropic: {
-    'claude-3-5-sonnet-latest': {
-      id: 'claude-3-5-sonnet-latest',
-      contextWindow: 200_000,
-      maxOutput: 8_192,
-      knowledgeCutoff: '2024-04'
-    }
   }
 };

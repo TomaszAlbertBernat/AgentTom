@@ -145,7 +145,6 @@ RESEND_API_KEY=your_resend_key
 ELEVENLABS_API_KEY=your_elevenlabs_key
 
 # Monitoring
-LANGFUSE_API_KEY=your_langfuse_key
 SENTRY_DSN=your_sentry_dsn
 
 # Caching (optional)
@@ -154,14 +153,36 @@ REDIS_URL=redis://localhost:6379
 
 ## 🧪 Testing Your Setup
 
-### 1. Check Service Status
+### Happy Path Checklist
+
+Use this checklist to verify AgentTom "just works" in local mode:
+
+- [ ] **Environment**: `.env` file exists with API keys (`GOOGLE_API_KEY` or `OPENAI_API_KEY`)
+- [ ] **Server starts**: `bun run dev` runs without errors
+- [ ] **Health check**: `curl http://localhost:3000/api/health` returns `{"status":"ok"}`
+- [ ] **Local mode**: `curl http://localhost:3000/api/local-user/me` shows `isLocal: true`
+- [ ] **Setup auto-skip**: If `.env` has API keys, setup wizard is skipped automatically
+- [ ] **Chat works**: Frontend loads at `http://localhost:3000` and chat functionality works
+- [ ] **Tools accessible**: `/tools` page shows available tools without auth prompts
+
+### Automated Validation Script
+
+Run the validation script to check all components:
+
+```bash
+bun run scripts/validate-happy-path.ts
+```
+
+### Manual Testing Steps
+
+#### 1. Check Service Status
 ```bash
 curl http://localhost:3000/api/web/health/details
 ```
 
 This shows which services are configured and your auth mode.
 
-### 2. Test Local User
+#### 2. Test Local User
 ```bash
 # Check your local user info
 curl http://localhost:3000/api/local-user/me
@@ -170,7 +191,7 @@ curl http://localhost:3000/api/local-user/me
 curl http://localhost:3000/api/local-user/config
 ```
 
-### 3. Test API Access (No Authentication Required!)
+#### 3. Test API Access (No Authentication Required!)
 ```bash
 # Test web scraping
 curl -X POST http://localhost:3000/api/web/get-contents \
@@ -181,7 +202,7 @@ curl -X POST http://localhost:3000/api/web/get-contents \
 curl http://localhost:3000/api/tools/list
 ```
 
-### 4. Test Chat (Once API Keys Are Configured)
+#### 4. Test Chat (Once API Keys Are Configured)
 ```bash
 # Create a conversation
 curl -X POST http://localhost:3000/api/conversations \

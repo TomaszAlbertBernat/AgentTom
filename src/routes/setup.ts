@@ -27,10 +27,42 @@ setup.get('/status', async (c) => {
     const status = setupService.getSetupStatus();
     const guide = setupService.getSetupGuide();
     
+    // Check service availability
+    const serviceAvailability = {
+      core: {
+        memory: true,
+        file: true,
+        speak: true,
+        crypto: true,
+        image: true
+      },
+      external: {
+        spotify: !!(process.env.SPOTIFY_CLIENT_ID || process.env.GOOGLE_API_KEY),
+        linear: !!(process.env.LINEAR_API_KEY || process.env.GOOGLE_API_KEY),
+        resend: !!(process.env.RESEND_API_KEY || process.env.GOOGLE_API_KEY),
+        map: !!process.env.GOOGLE_API_KEY,
+        web: !!(process.env.FIRECRAWL_API_KEY || process.env.GOOGLE_API_KEY),
+        calendar: !!process.env.GOOGLE_API_KEY,
+        youtube: true
+      }
+    };
+
+    const externalServicesCount = Object.values(serviceAvailability.external).filter(Boolean).length;
+
     return c.json({
       status,
       guide,
       availableModels: setupService.getAvailableModels(),
+      services: {
+        ...serviceAvailability,
+        summary: {
+          coreServices: 5,
+          externalServices: externalServicesCount,
+          message: externalServicesCount > 0
+            ? `${externalServicesCount} external services available`
+            : 'Core functionality only - add API keys for more features'
+        }
+      }
     });
   } catch (error) {
     return c.json({ 
@@ -62,7 +94,7 @@ setup.post('/user-info', zValidator('json', userInfoSchema), async (c) => {
 
 // Setup API key
 const apiKeySchema = z.object({
-  service: z.enum(['google', 'openai', 'anthropic', 'xai']),
+  service: z.enum(['google', 'openai', 'xai']),
   key: z.string().min(10, 'API key must be at least 10 characters'),
   testKey: z.boolean().optional().default(false),
 });
@@ -132,7 +164,7 @@ setup.post('/reset', async (c) => {
 
 // Test API key during setup
 const testKeySchema = z.object({
-  service: z.enum(['google', 'openai', 'anthropic', 'xai']),
+  service: z.enum(['google', 'openai', 'xai']),
   key: z.string().min(10),
 });
 

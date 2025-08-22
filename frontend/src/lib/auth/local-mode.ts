@@ -10,17 +10,24 @@ export async function isLocalMode(): Promise<boolean> {
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/api/local-user/me`, {
       cache: 'no-store',
     });
-    
+
     if (response.ok) {
       const data = await response.json();
       return data.isLocal === true;
     }
-    
+
     return false;
   } catch (error) {
     // If we can't reach the API, assume we're not in local mode
     return false;
   }
+}
+
+// Simple check for local mode (fallback if API is not available)
+export function isLocalModeSync(): boolean {
+  // This is a client-side check, but we can infer from the setup
+  // The real check should be done server-side via API call
+  return true; // Default to local mode for now
 }
 
 // Get local user information

@@ -228,11 +228,6 @@ const imageService = {
     try {
       const parsed = imagePayloadSchema.parse({ action, payload });
 
-      span?.event({
-        name: 'image_action_start',
-        input: { action, payload }
-      });
-
       switch (parsed.action) {
         case 'analyze': {
           const { image_url, query, context } = parsed.payload;
@@ -271,11 +266,6 @@ const imageService = {
           });
 
           const analysis_text = typeof analysis_result === 'string' ? analysis_result : 'Unable to analyze image';
-
-          span?.event({
-            name: 'image_analysis_success',
-            output: { analysis_length: analysis_text.length }
-          });
 
           return documentService.createDocument({
             source_uuid: uuidv4(),
@@ -318,12 +308,6 @@ const imageService = {
               }
               uploaded_url = await uploadImageFromUrl(image_url, `generated_${Date.now()}.png`);
             }
-
-            span?.event({
-              name: 'image_generation_success',
-              input: { prompt, size, quality, style },
-              output: { image_url: uploaded_url }
-            });
 
             return documentService.createDocument({
               source_uuid: uuidv4(),
@@ -382,12 +366,6 @@ const imageService = {
             // Upload the edited image to our storage
             const uploaded_url = await uploadImageFromUrl(edited_image_url, `edited_${Date.now()}.png`);
 
-            span?.event({
-              name: 'image_edit_success',
-              input: { image_url, mask_url, prompt, size },
-              output: { edited_image_url: uploaded_url }
-            });
-
             return documentService.createDocument({
               source_uuid: uuidv4(),
               conversation_uuid,
@@ -435,12 +413,6 @@ const imageService = {
               )
             );
 
-            span?.event({
-              name: 'image_variation_success',
-              input: { image_url, n, size },
-              output: { variations: uploaded_urls }
-            });
-
             return documentService.createDocument({
               source_uuid: uuidv4(),
               conversation_uuid,
@@ -479,12 +451,6 @@ const imageService = {
 
             const image_url = `${process.env.APP_URL}/api/files/${upload_result.uuid}`;
 
-            span?.event({
-              name: 'image_upload_success',
-              input: { filename, description },
-              output: { image_url }
-            });
-
             return documentService.createDocument({
               source_uuid: uuidv4(),
               conversation_uuid,
@@ -509,13 +475,6 @@ const imageService = {
           throw new Error(`Unknown action: ${action}`);
       }
     } catch (error) {
-      span?.event({
-        name: 'image_action_error',
-        input: { action, payload },
-        output: { error: error instanceof Error ? error.message : 'Unknown error' },
-        level: 'ERROR'
-      });
-
       return documentService.createErrorDocument({
         error: error instanceof Error ? error : new Error('Unknown error'),
         conversation_uuid,

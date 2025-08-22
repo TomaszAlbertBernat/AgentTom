@@ -22,7 +22,7 @@ const userInfoSchema = z.object({
 });
 
 const apiKeySetupSchema = z.object({
-  service: z.enum(['google', 'openai', 'anthropic', 'xai']),
+  service: z.enum(['google', 'openai', 'xai']),
   key: z.string().min(10, 'API key must be at least 10 characters'),
   testKey: z.boolean().optional().default(false),
 });
@@ -53,12 +53,22 @@ export const setupService = {
     const completedSteps: string[] = [];
     const recommendations: string[] = [];
 
-    // Check basic user info
-    if (config.name && config.name !== 'Local User') {
+    // Check if setup is already marked as completed
+    if (config.preferences.setupCompleted) {
+      return {
+        isComplete: true,
+        completedSteps: ['user_info', 'api_keys', 'preferences'],
+        requiredSteps: ['user_info', 'api_keys'],
+        recommendations: [],
+      };
+    }
+
+    // Check basic user info - completed if user has provided a name
+    if (config.name && config.name.trim() !== '' && config.name !== 'Local User') {
       completedSteps.push('user_info');
     }
 
-    // Check API keys
+    // Check API keys - completed if at least one AI provider key is present
     const hasGoogleKey = !!getApiKey('google');
     const hasOpenAIKey = !!getApiKey('openai');
     const hasAnyAIKey = hasGoogleKey || hasOpenAIKey;
@@ -67,10 +77,12 @@ export const setupService = {
       completedSteps.push('api_keys');
     }
 
-    // Check preferences
-    if (config.preferences.theme !== 'system' || 
-        config.preferences.language !== 'en' || 
-        config.preferences.model !== 'gemini-2.5-flash') {
+    // Check preferences - completed if user has made any preference changes
+    const hasCustomPreferences = config.preferences.theme !== 'system' ||
+        config.preferences.language !== 'en' ||
+        config.preferences.model !== 'gemini-2.5-flash';
+
+    if (hasCustomPreferences) {
       completedSteps.push('preferences');
     }
 
@@ -86,6 +98,9 @@ export const setupService = {
     }
     if (!hasGoogleKey && hasOpenAIKey) {
       recommendations.push('Consider adding Google AI Studio key for primary AI service');
+    }
+    if (config.name === 'Local User') {
+      recommendations.push('Set your name to personalize your experience');
     }
 
     const isComplete = requiredSteps.every(step => completedSteps.includes(step));
@@ -268,7 +283,7 @@ export const setupService = {
       { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'google' },
       { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' },
       { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai' },
-      { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'anthropic' },
+
       { id: 'grok-2', name: 'Grok 2', provider: 'xai' },
     ];
   },

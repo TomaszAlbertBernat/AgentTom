@@ -10,7 +10,7 @@ export const whitelistedDomains = [
     { name: 'imdb', url: 'imdb.com', scrappable: true },
     { name: 'techcrunch', url: 'techcrunch.com', scrappable: true },
     { name: 'hacker news', url: 'news.ycombinator.com', scrappable: true },
-    { name: 'anthropic', url: 'anthropic.com', scrappable: true },
+
     { name: 'DeepMind', url: 'deepmind.google', scrappable: true },
     { name: 'musicbrainz', url: 'musicbrainz.org', scrappable: true },
     { name: 'sonos', url: 'sonos.com', scrappable: true },

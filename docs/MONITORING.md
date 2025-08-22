@@ -89,8 +89,7 @@ Track AI interactions and performance:
 
 ```bash
 # Add to .env
-LANGFUSE_API_KEY=your_langfuse_key
-LANGFUSE_HOST=https://cloud.langfuse.com
+# Langfuse has been removed from the stack as part of simplification
 ```
 
 Features:

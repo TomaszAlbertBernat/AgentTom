@@ -25,7 +25,7 @@ import {SimpleSpan} from './observer.service';
 import {prompt as fastTrackPrompt} from '../../prompts/agent/fast';
 import { linearService } from '../tools/linear.service';
 import { calendarService } from './calendar.service';
-import { toolsMap } from '../../config/tools.config';
+import { getToolsMap, ToolName } from '../../config/tools.config';
 import { memoryService } from './memory.service';
 
 /**
@@ -38,7 +38,7 @@ export const aiService = {
   /**
    * Determines if a query can be answered quickly without complex reasoning
    * Uses fast-track analysis to bypass full reasoning loop for simple queries
-   * @param span - Langfuse trace client for tracking the fast-track decision
+   * @param span - Tracing span for the fast-track decision
    * @returns Promise that resolves to true if fast-track should be used, false otherwise
    * @example
    * ```typescript
@@ -131,7 +131,7 @@ export const aiService = {
   /**
    * Observes the current environment and context to understand the situation
    * Analyzes the user's message and current state to form environmental awareness
-   * @param span - Langfuse span client for tracing the observation phase
+   * @param span - Tracing span for the observation phase
    * @returns Promise that resolves to the updated agent state
    * @example
    * ```typescript
@@ -199,7 +199,7 @@ export const aiService = {
   /**
    * Drafts initial thoughts about tools and memory relevant to the current task
    * Analyzes available tools and retrieves relevant memories for context
-   * @param span - Langfuse span client for tracing the drafting phase
+   * @param span - Tracing span for the drafting phase
    * @returns Promise that resolves when drafting is complete
    * @example
    * ```typescript
@@ -268,7 +268,7 @@ export const aiService = {
   /**
    * Plans tasks based on the current context and user request
    * Breaks down the user's request into actionable tasks and persists them
-   * @param span - Langfuse span client for tracing the planning phase
+   * @param span - Tracing span for the planning phase
    * @returns Promise that resolves to the updated agent state
    * @example
    * ```typescript
@@ -318,7 +318,7 @@ export const aiService = {
   /**
    * Selects the next action to take based on current tasks and context
    * Chooses appropriate tools and creates action records for execution
-   * @param span - Langfuse span client for tracing the action selection phase
+   * @param span - Tracing span for the action selection phase
    * @returns Promise that resolves to the selected action or undefined if no action needed
    * @example
    * ```typescript
@@ -424,7 +424,7 @@ export const aiService = {
   /**
    * Generates tool usage parameters for the selected action
    * Gathers relevant context and determines specific parameters for tool execution
-   * @param span - Langfuse span client for tracing the tool usage phase
+   * @param span - Tracing span for the tool usage phase
    * @returns Promise that resolves to tool use payload or null if no tool use needed
    * @example
    * ```typescript
@@ -513,7 +513,7 @@ export const aiService = {
    * Executes the selected tool with the generated payload
    * Handles tool execution, result processing, and state updates
    * @param payload - Tool use payload containing action and parameters
-   * @param span - Langfuse span client for tracing the execution phase
+   * @param span - Tracing span for the execution phase
    * @returns Promise that resolves to the tool execution result
    * @throws Error if tool is not found or execution fails
    * @example
@@ -529,6 +529,7 @@ export const aiService = {
     const state = stateManager.getState();
     const current_tool = state.config.current_tool;
 
+    const toolsMap = await getToolsMap();
     const tool = toolsMap[current_tool?.name ?? 'unknown'];
     if (!tool) {
       await span.end?.({
@@ -538,7 +539,7 @@ export const aiService = {
     }
 
     try {
-      const result = await tool.execute(action, {...payload, conversation_uuid: state.config.conversation_uuid};
+      const result = await tool.execute(action, {...payload, conversation_uuid: state.config.conversation_uuid});
 
       if (state.config.current_action?.uuid) {
         await updateActionState({

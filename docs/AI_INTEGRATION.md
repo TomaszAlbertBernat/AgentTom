@@ -117,15 +117,10 @@ AgentTom tracks:
 - Error rates and fallback usage
 - Conversation completion rates
 
-### Langfuse Integration
-Optional AI observability:
-```bash
-# Add to .env
-LANGFUSE_API_KEY=your_langfuse_key
-LANGFUSE_HOST=https://cloud.langfuse.com
-```
+### AI Observability
+Langfuse has been removed as part of tech stack simplification for local-first usage.
 
-Features:
+Features previously available:
 - Trace conversation flows
 - Monitor model performance
 - Track costs and usage

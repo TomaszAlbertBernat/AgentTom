@@ -153,10 +153,10 @@ const createBaseConfig = ({model = resolveDefaultModel(), messages, temperature 
  * LLM Completion Service
  * 
  * Provides text generation, streaming, and structured object completion using various LLM providers.
- * Supports OpenAI, Anthropic, and other providers with automatic model selection and configuration.
+ * Supports Google Gemini and OpenAI providers with automatic model selection and configuration.
  * 
  * Key features:
- * - Multi-provider support (OpenAI, Anthropic, XAI)
+ * - Multi-provider support (Google Gemini, OpenAI)
  * - Streaming text generation
  * - Structured object generation
  * - Automatic token limit management

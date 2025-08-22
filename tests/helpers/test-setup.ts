@@ -14,7 +14,7 @@ export const mockEnv = {
   LOG_LEVEL: 'ERROR', // Reduce noise in tests
   DATABASE_URL: ':memory:', // Use in-memory SQLite for tests
   OPENAI_API_KEY: 'test-openai-key',
-  ANTHROPIC_API_KEY: 'test-anthropic-key',
+
   QDRANT_URL: 'http://localhost:6333',
   ALGOLIA_APPLICATION_ID: 'test-algolia-app-id',
   ALGOLIA_API_KEY: 'test-algolia-key',

@@ -31,7 +31,6 @@ const localUserSchema = z.object({
   apiKeys: z.object({
     google: z.string().optional(),
     openai: z.string().optional(),
-    anthropic: z.string().optional(),
     xai: z.string().optional(),
     elevenlabs: z.string().optional(),
     resend: z.string().optional(),
@@ -45,7 +44,6 @@ const localUserSchema = z.object({
   apiKeyMetadata: z.object({
     google: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
     openai: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
-    anthropic: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
     xai: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
     elevenlabs: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
     resend: z.object({ createdAt: z.string(), lastRotated: z.string().optional() }).optional(),
@@ -86,6 +84,75 @@ const getConfigPath = (): string => {
 };
 
 /**
+ * Create configuration from environment variables
+ * Automatically sets up API keys and marks setup as complete if keys are present
+ */
+const createConfigFromEnvironment = (): LocalUserConfig => {
+  const baseConfig = { ...defaultConfig };
+  let hasApiKeys = false;
+
+  // Check for Google API key
+  if (process.env.GOOGLE_API_KEY) {
+    console.log('🔑 Found GOOGLE_API_KEY in environment, auto-configuring...');
+    baseConfig.apiKeys.google = process.env.GOOGLE_API_KEY;
+    baseConfig.apiKeyMetadata.google = {
+      createdAt: new Date().toISOString(),
+    };
+    hasApiKeys = true;
+  }
+
+  // Check for OpenAI API key
+  if (process.env.OPENAI_API_KEY) {
+    console.log('🔑 Found OPENAI_API_KEY in environment, auto-configuring...');
+    baseConfig.apiKeys.openai = process.env.OPENAI_API_KEY;
+    baseConfig.apiKeyMetadata.openai = {
+      createdAt: new Date().toISOString(),
+    };
+    hasApiKeys = true;
+  }
+
+  // Check for other optional API keys
+  if (process.env.ELEVENLABS_API_KEY) {
+    baseConfig.apiKeys.elevenlabs = process.env.ELEVENLABS_API_KEY;
+    baseConfig.apiKeyMetadata.elevenlabs = {
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  if (process.env.RESEND_API_KEY) {
+    baseConfig.apiKeys.resend = process.env.RESEND_API_KEY;
+    baseConfig.apiKeyMetadata.resend = {
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  if (process.env.FIRECRAWL_API_KEY) {
+    baseConfig.apiKeys.firecrawl = process.env.FIRECRAWL_API_KEY;
+    baseConfig.apiKeyMetadata.firecrawl = {
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  if (process.env.LINEAR_API_KEY) {
+    baseConfig.apiKeys.linear = process.env.LINEAR_API_KEY;
+    baseConfig.apiKeyMetadata.linear = {
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  // If we have API keys from environment, mark setup as complete
+  if (hasApiKeys) {
+    console.log('✅ Auto-setup complete! Found API keys in environment.');
+    baseConfig.preferences.setupCompleted = true;
+    baseConfig.name = process.env.USER_NAME || process.env.USERNAME || 'Local User';
+  } else {
+    console.log('ℹ️  No API keys found in environment. Setup wizard will be required.');
+  }
+
+  return baseConfig;
+};
+
+/**
  * Ensure configuration directory exists
  */
 const ensureConfigDir = (): void => {
@@ -104,9 +171,13 @@ export const loadLocalUserConfig = (): LocalUserConfig => {
 
     if (!fs.existsSync(configPath)) {
       console.log('📝 No local user config found, creating default configuration');
+
+      // Check for API keys in environment and auto-setup if found
+      const envConfig = createConfigFromEnvironment();
+
       ensureConfigDir();
-      fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
-      return defaultConfig;
+      fs.writeFileSync(configPath, JSON.stringify(envConfig, null, 2));
+      return envConfig;
     }
 
     const configData = fs.readFileSync(configPath, 'utf-8');
@@ -303,7 +374,7 @@ export const getApiKeyMetadata = (service: keyof LocalUserConfig['apiKeys']) => 
  * List all configured API keys with their metadata
  */
 export const listApiKeys = () => {
-  const services = ['google', 'openai', 'anthropic', 'xai', 'elevenlabs', 'resend', 'firecrawl', 'linear', 'spotify'] as const;
+  const services = ['google', 'openai', 'xai', 'elevenlabs', 'resend', 'firecrawl', 'linear', 'spotify'] as const;
   
   return services.reduce((acc, service) => {
     const metadata = getApiKeyMetadata(service);

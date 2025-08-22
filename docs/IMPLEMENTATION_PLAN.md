@@ -28,7 +28,7 @@ This implementation plan outlines the phased approach to simplify the AgentTom t
 **Goal**: Remove unused dependencies and simplify package.json
 **Tasks**:
 - [ ] Audit current dependencies in both backend and frontend
-- [ ] Remove unused packages (e.g., ioredis, langfuse, @ai-sdk/anthropic)
+- [x] Remove unused packages (e.g., ioredis, langfuse, @ai-sdk/anthropic) - COMPLETED: langfuse removed as part of SIMPLIFY-003-CONTINUATION
 - [ ] Update package.json files with simplified dependency lists
 - [ ] Verify core functionality still works
 

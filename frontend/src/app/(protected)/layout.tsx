@@ -3,21 +3,24 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import LogoutButton from '@/components/LogoutButton';
 import dynamic from 'next/dynamic';
-import { isAuthenticated, needsSetup } from '@/lib/auth/local-mode';
+import { isAuthenticated, needsSetup, isLocalMode } from '@/lib/auth/local-mode';
 
 const RateLimitBanner = dynamic(() => import('@/components/RateLimitBanner'), { ssr: false });
 
 export default async function ProtectedLayout({ children }: { children: ReactNode }) {
   const auth = await isAuthenticated();
-  
-  if (!auth.authenticated) {
+  const isLocal = await isLocalMode();
+
+  // In local mode, always allow access (no auth redirect)
+  if (!isLocal && !auth.authenticated) {
     redirect('/login');
   }
-  
+
   // If in local mode and setup is needed, redirect to setup
-  if (auth.isLocal && await needsSetup()) {
+  if (isLocal && await needsSetup()) {
     redirect('/setup');
   }
+
   return (
     <div className="min-h-screen flex">
       <aside className="w-56 border-r p-4 space-y-3">
@@ -30,9 +33,12 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
           <Link href="/files">Files</Link>
           <Link href="/search">Search</Link>
         </nav>
-        <div className="pt-2 border-t mt-2">
-          <LogoutButton />
-        </div>
+        {/* Only show logout button in multi-user mode */}
+        {!isLocal && (
+          <div className="pt-2 border-t mt-2">
+            <LogoutButton />
+          </div>
+        )}
       </aside>
       <main className="flex-1 p-0">
         <RateLimitBanner />

@@ -73,7 +73,7 @@ export const createObserver = () => {
           // No-op for local-first usage
         }
       };
-      observer.activeSpans.set(span.id;
+      observer.activeSpans.set(span.id, span);
       return span;
     },
 

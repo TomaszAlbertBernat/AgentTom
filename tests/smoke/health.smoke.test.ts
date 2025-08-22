@@ -68,7 +68,7 @@ mock.module('../../src/config/env.config', () => ({
     services: {
       googleApiKey: 'test-key',
       openaiApiKey: null,
-      anthropicApiKey: null
+
     }
   }
 }));

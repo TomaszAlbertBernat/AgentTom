@@ -525,7 +525,7 @@ const linearService = {
   formatIssues: async (issues: Issue[]): Promise<string> => {
     try {
 
-      const { projectMap, stateMap } = await formatters.getContextMaps(undefined);
+      const { projectMap, stateMap } = await formatters.getContextMaps();
       
       // Wait for all issue details to be formatted
       const formattedIssues = await Promise.all(
@@ -647,7 +647,7 @@ ${successful.map(issue => `- "${issue.title}" (${issue.id})`).join('\n')}`;
         }
 
         case 'get_projects': {
-          const projects = await linearService.fetchProjects(undefined);
+          const projects = await linearService.fetchProjects();
           const formattedContent = formatters.formatProjectsList(projects);
 
           return documentService.createDocument({

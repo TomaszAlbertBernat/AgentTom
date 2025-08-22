@@ -97,7 +97,6 @@ const webService = {
    * Scrapes content from a URL and creates a document
    * @param url - The URL to scrape content from
    * @param conversation_uuid - UUID of the current conversation
-   * @param span - Optional Langfuse span for tracing
    * @returns Promise that resolves to a document containing the scraped content
    * @throws Error if scraping fails or URL is inaccessible
    * @example
@@ -189,7 +188,6 @@ const webService = {
    * Currently supports intelligent web search with AI-powered query generation
    * @param action - The action to perform ('search' or 'getContents')
    * @param payload - Action-specific payload data
-   * @param span - Optional Langfuse span for tracing
    * @returns Promise that resolves to a document containing the operation result
    * @throws Error if action is invalid or operation fails
    * @example

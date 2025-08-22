@@ -49,7 +49,7 @@ const elevenlabsService = {
    * @param {string} text - Text to convert to speech
    * @param {string} [voice='21m00Tcm4TlvDq8ikWAM'] - Voice ID to use for generation
    * @param {string} [model_id='eleven_turbo_v2_5'] - Model ID for speech generation
-   * @param {LangfuseSpanClient} [span] - Optional Langfuse span for tracking
+   * @param {any} [span] - Optional span for tracking (deprecated)
    * @returns {Promise<AsyncIterable<Uint8Array>>} Streaming audio data
    * @throws {Error} When text-to-speech generation fails
    */

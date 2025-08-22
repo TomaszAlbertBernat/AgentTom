@@ -93,7 +93,7 @@ localUser.get('/api-keys', async (c) => {
 
 // Set API key for a service
 const setApiKeySchema = z.object({
-  service: z.enum(['google', 'openai', 'anthropic', 'xai', 'elevenlabs', 'resend', 'firecrawl', 'linear']),
+  service: z.enum(['google', 'openai', 'xai', 'elevenlabs', 'resend', 'firecrawl', 'linear']),
   key: z.string().min(1),
 });
 
@@ -177,6 +177,51 @@ localUser.get('/me', async (c) => {
     scopes: user.scopes,
     isLocal: user.isLocal,
   });
+});
+
+// Service status endpoint
+localUser.get('/service-status', async (c) => {
+  try {
+    const availableServices = {
+      core: {
+        memory: true,
+        file: true,
+        speak: true,
+        crypto: true,
+        image: true
+      },
+      external: {
+        spotify: !!process.env.SPOTIFY_CLIENT_ID && !!process.env.SPOTIFY_CLIENT_SECRET,
+        linear: !!process.env.LINEAR_API_KEY,
+        resend: !!process.env.RESEND_API_KEY,
+        map: !!process.env.GOOGLE_API_KEY,
+        web: !!process.env.FIRECRAWL_API_KEY,
+        calendar: !!process.env.GOOGLE_API_KEY,
+        youtube: true // Always available for transcript extraction
+      }
+    };
+
+    const enabledCount = Object.values(availableServices.external).filter(Boolean).length;
+    const totalExternal = Object.keys(availableServices.external).length;
+
+    return c.json({
+      success: true,
+      data: {
+        ...availableServices,
+        summary: {
+          coreServicesAvailable: 5,
+          externalServicesAvailable: enabledCount,
+          externalServicesTotal: totalExternal,
+          externalServicesEnabled: enabledCount > 0
+        }
+      }
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
 });
 
 export { localUser as localUserRoutes };

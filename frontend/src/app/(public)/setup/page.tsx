@@ -55,7 +55,7 @@ export default function SetupPage() {
   const [preferences, setPreferences] = useState({
     theme: 'system' as 'light' | 'dark' | 'system',
     language: 'en',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash', // Default to gemini-2.5-flash as required
   });
 
   useEffect(() => {
@@ -222,7 +222,8 @@ export default function SetupPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to AgentTom</h1>
-          <p className="text-gray-600">Let's get you set up in just a few steps</p>
+          <p className="text-gray-600 mb-2">Local Mode Setup</p>
+          <p className="text-sm text-gray-500">Just a few quick steps to get you chatting with AI</p>
         </div>
 
         {/* Progress bar */}
@@ -403,7 +404,7 @@ function UserInfoStep({ userInfo, setUserInfo, onSubmit, loading, isComplete }: 
 }
 
 function ApiKeyStep({ providers, onSubmit, loading, isComplete, setupStatus }: any) {
-  const [selectedProvider, setSelectedProvider] = useState('');
+  const [selectedProvider, setSelectedProvider] = useState('google'); // Default to Google
   const [apiKey, setApiKey] = useState('');
   const [testing, setTesting] = useState(false);
 
@@ -417,7 +418,7 @@ function ApiKeyStep({ providers, onSubmit, loading, isComplete, setupStatus }: a
 
   const testApiKey = async () => {
     if (!selectedProvider || !apiKey) return;
-    
+
     setTesting(true);
     try {
       const response = await fetch('/api/setup/test-api-key', {
@@ -425,7 +426,7 @@ function ApiKeyStep({ providers, onSubmit, loading, isComplete, setupStatus }: a
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ service: selectedProvider, key: apiKey }),
       });
-      
+
       const data = await response.json();
       alert(data.valid ? 'API key is valid!' : `API key test failed: ${data.error}`);
     } catch (err) {
@@ -438,7 +439,9 @@ function ApiKeyStep({ providers, onSubmit, loading, isComplete, setupStatus }: a
   return (
     <div>
       <h2 className="text-xl font-semibold mb-4">AI Provider Setup</h2>
-      <p className="text-gray-600 mb-6">Configure at least one AI provider to enable chat functionality.</p>
+      <p className="text-gray-600 mb-6">
+        Choose your AI provider to start chatting. We recommend Google AI Studio for its generous free tier and excellent performance.
+      </p>
       
       {hasApiKeys && (
         <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded">

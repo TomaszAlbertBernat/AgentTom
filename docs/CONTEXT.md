@@ -75,9 +75,8 @@ Active development priorities:
 ### 📊 Monitoring & Debugging
 
 **Observability:**
-- **Monitoring Setup**: [MONITORING.md](MONITORING.md) - Health checks, logging, external tools
+- **Monitoring Setup**: [MONITORING.md](MONITORING.md) - Health checks, logging, optional external tools
 - **Debug Procedures**: [MONITORING.md](MONITORING.md#debugging-tools) - Log analysis, health endpoints
-- **AI Observability**: Langfuse integration for conversation tracking
 
 ## 🔑 Critical Configuration Rules
 
